@@ -9,15 +9,16 @@
 <body>
   <main class="start-screen">
     <img class="start-screen__illustration" src="assets/cone.svg" alt="">
-
-    <button type="button" class="btn btn-primary btn-shadow-inset">
+    <button type="button" id="connect-db-button" class="btn btn-primary btn-shadow-inset">
       <svg class="btn__icon" viewBox="0 0 20 16" aria-hidden="true">
         <path d="M1 2.5C1 1.67 1.67 1 2.5 1H7l1.5 2H17.5c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5h-15C1.67 15 1 14.33 1 13.5v-11Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
       </svg>
-      Datenbank finden und verknüpfen
+      <span data-i18n="start.connect-db-button">Datenbank finden und verknüpfen</span>
     </button>
-
-    <a class="link-secondary" href="#">Wie du die Datenbank findest und herunterlädst</a>
+    <a class="link-secondary" href="#">
+      <span data-i18n="start.help-find-db">Wie du die Datenbank findest und herunterlädst</span>
+    </a>
   </main>
+  <script type="module" src="main.js"></script>
 </body>
 </html>

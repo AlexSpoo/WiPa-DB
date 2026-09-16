@@ -1,5 +1,14 @@
 # DEVLOG
 
+## 2026-09-16 — Ordner-Auswahl, Vite, persistente Speicherung
+
+**Ziel:** Button-Funktionalität: nativen Ordner-Dialog öffnen und den gewählten Pfad dauerhaft speichern, damit er beim nächsten App-Start nicht erneut abgefragt werden muss.
+**Umsetzung:** Tauri-Dialog-Plugin (`tauri-plugin-dialog` + `@tauri-apps/plugin-dialog`) eingebunden, erstes JS (`src/main.js`) mit Klick-Handler auf den Button. Vite als Build-Tool ergänzt (`vite.config.js`, `tauri.conf.json`/`package.json` angepasst), um npm-Paket-Importe im Frontend aufzulösen. Tauri-Store-Plugin (`tauri-plugin-store` + `@tauri-apps/plugin-store`) eingebunden, gewählter Ordner wird nach `settings.json` im App-Daten-Ordner geschrieben.
+**Entscheidungen:** Store-Plugin statt `localStorage` gewählt — Daten landen als einsehbare Datei im OS-App-Daten-Ordner statt in einer versteckten Browser-Datenbank, passender für eine "richtige" Desktop-App und BA-Verteidigung. Auslesen des gespeicherten Ordners beim App-Start wird erst umgesetzt, sobald ein zweiter Screen existiert (Verhalten sonst nicht sinnvoll festlegbar).
+**Probleme / Sackgassen:** `import ... from "@tauri-apps/plugin-dialog"` schlug zunächst fehl — Browser/WebView lösen npm-Paketnamen ohne Bundler nicht auf. Behoben durch Einführung von Vite statt eines Workarounds (Import Map), da absehbar war, dass weitere Plugins denselben Bedarf haben würden.
+**Aufwand:** ~1h.
+**Offen:** Auslese-Logik beim App-Start (abhängig von zweitem Screen), `identifier` in `tauri.conf.json` weiterhin Platzhalter, Datei-Dialog/i18n-Feinschliff, macOS-Build.
+
 ## 2026-09-16 — Button-Interaktion & Roboto Mono
 
 **Ziel:** Wiederverwendbare Inner-Shadow-Komponente für Haupt-Buttons, Hover-Vergrößerung, und Schriftart passend zu Figma (Roboto Mono statt System-Monospace-Stack).

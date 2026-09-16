@@ -1,14 +1,21 @@
 {
   "name": "data-app",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "tauri": "tauri",
-    "dev": "tauri dev",
-    "build": "tauri build"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4"
+    "@tauri-apps/cli": "^2.11.4",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-store": "^2.4.5"
   }
 }
