@@ -46,6 +46,11 @@ Regeln fürs Review:
 (wächst mit dem Projekt — hier landen Entscheidungen, die wir bewusst getroffen
 haben, damit sie nicht in jedem Review neu diskutiert werden)
 
+- Ausnahme von "keine absolute Positionierung": erlaubt für Overlay-artige UI
+  (z. B. das aufklappende Burger-Menü in `app-header.js`), die sich über andere
+  Elemente legen muss, ohne sie zu verschieben — dafür ist Flexbox strukturell
+  ungeeignet. Keine generelle Abkehr von Flexbox als Standard-Layout-Methode.
+
 ## Dokumentation
 
 Datei: `docs/DEVLOG.md` — chronologisch, neuester Eintrag oben.
@@ -77,4 +82,4 @@ warum entschieden?
 - Wenn eine Entscheidung dauerhaft gilt, kommt sie zusätzlich als eine Zeile
   unter "Projektkonventionen" in diese Datei hier.
 - Schlag mir zu jedem Arbeitsschritt eine Commit-Message vor (kurz, im
-  Imperativ, auf Deutsch).
+  Imperativ, auf Englisch).

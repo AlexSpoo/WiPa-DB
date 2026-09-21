@@ -38,12 +38,26 @@ html,
 body {
   height: 100%;
   margin: 0;
+  display: flex; 
+  flex-direction: column; 
+  min-height: 100vh;
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-mono);
+}
+
+header {
+  position: relative;
+
+}
+
+main {
+  display: flex; 
+  flex-direction: column; 
+  flex: 1;
 }
 
 button {
@@ -56,6 +70,16 @@ a {
 }
 
 /* Layout */
+.menu-nav {
+  position: absolute;
+  flex-direction: column;
+  display: none;
+}
+
+.is-open {
+  display: flex;
+}
+
 .start-screen {
   display: flex;
   flex-direction: column;
@@ -70,6 +94,83 @@ a {
   width: min(480px, 80vw);
   height: auto;
 }
+
+.dashboard-grid {
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5vh;
+  margin: 5vh;
+  
+}
+
+.dashboard-tile{
+  
+}
+
+.upload-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.drag-drop-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60vh;
+  border: 3px dashed var(--color-line);
+  border-radius: 4vh;
+  padding: 6vh;
+  background-color: color-mix(in srgb, var(--color-text) 10%, transparent);
+
+}
+
+.drag-drop-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  flex: 1;
+  gap: 2vh;
+}
+
+.drag-drop-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2vh;
+}
+
+.drag-drop-info.is-horizontal { 
+  flex-direction: row; 
+}
+
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 96px);
+  gap: 2vh;
+  max-height: 30vh;
+  overflow-y: auto;
+  width: 100%;
+}
+
+
+/* kleine elemente */
+.file-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.file-tile-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 
 /* Buttons */
 .btn {
@@ -94,8 +195,8 @@ a {
 }
 
 .btn-shadow-inset {
-  --shadow-color: color-mix(in srgb, var(--color-text) 40%, transparent);
-  box-shadow: inset 0 0 10px 8px var(--shadow-color);
+  --shadow-color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  box-shadow: inset 0 0 18px 8px var(--shadow-color);
 }
 
 .btn-shadow-inset:hover {

@@ -1,0 +1,38 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiPa DB - Upload</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <app-header></app-header>
+    <main class="upload">
+        <h1>Hochladen</h1>
+        <div class="upload-box">
+            <div class="drag-drop-box">
+                <div class="drag-drop-content">
+                    <div class="file-grid"></div>
+                    <div class="drag-drop-info">
+                        <div class="upload-icon">↑</div>
+                        <div class="drag-drop-text">
+                            <span>drag & drop</span>
+                        </div>
+                        <div class="or-text">
+                            <span>oder</span>
+                        </div>
+                        <button type="button" id="upload-files-button" class="btn btn-primary btn-shadow-inset">
+                            <span data-i18n="start.upload-files-button">Finden und hochladen</span>
+                        </button>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="upload.js"></script>
+</body>
+</html>

@@ -1,5 +1,14 @@
 # DEVLOG
 
+## 2026-09-21 — Dashboard, geteilter Header, Upload-Seite (Grundgerüst)
+
+**Ziel:** Navigation zu den sechs Funktionsbereichen nach der Datenbank-Verbindung, geteilte Kopfzeile für alle Unterseiten, Start der Upload-Funktion (Dateiauswahl + Anzeige).
+**Umsetzung:** `src/pages/dashboard.html` mit Bento-Grid aus sechs Kacheln (CSS Grid). Sechs Platzhalter-Unterseiten (`upload.html`, `transcribe.html`, `templates.html`, `tag.html`, `evaluate.html`, `export.html`). Geteilter Header als Web Component (`src/shared/app-header.js`, Custom Element `<app-header>`) mit Zurück-Link und aufklappbarem Burger-Menü (Overlay-Positionierung). `src/main.js` erweitert: Weiterleitung zum Dashboard nach erfolgreicher Ordnerauswahl, sowie beim App-Start, falls schon ein Ordner gespeichert ist. `upload.html`/`upload.js`: Datei-Auswahl-Dialog (mehrere Bilder), Anzeige als Icon+Dateiname-Kacheln in einem responsiven Grid, das komplett aus dem aktuellen Auswahl-Zustand neu gerendert wird.
+**Entscheidungen:** Mehrere echte HTML-Seiten statt SPA für die sechs Funktionsbereiche (einfacher, in sich abgeschlossen). Web Component statt dupliziertem Markup oder nachgeladenem HTML-Schnipsel für den geteilten Header. Bewusste, dokumentierte Ausnahme von "keine absolute Positionierung" fürs Burger-Menü-Overlay (in CLAUDE.md unter Projektkonventionen notiert). Datei-Auswahl-Zwischenstand (`filesToUpload`) bewusst nicht dauerhaft gespeichert (weder Store noch `sessionStorage`) — reicht als einfache Variable, weil kein Seitenwechsel während der Auswahl stattfindet. Grid wird bei jeder Änderung komplett neu aufgebaut statt einzelne Kacheln zu patchen, um spätere Lösch-Funktion ohne Sync-Risiko zu ermöglichen.
+**Probleme / Sackgassen:** Erste Idee für die Unterseiten-Navigation war ein iframe-basierter Ansatz — verworfen wegen Isolationsproblemen (Styling, Browser-Verlauf), zugunsten des Web Components. `flex-direction` ohne `display: flex` gesetzt (keine Wirkung). Grid blieb einspaltig, weil das Elternelement `align-items: center` hatte und dem Grid dadurch keine Breite zum Verteilen gab. Mehrfache Copy-Paste-Fehler beim Übertragen von Mustern zwischen Seiten (Store-Methode `add` existiert nicht, Scope-Fehler bei `const` in `if`-Blöcken, fehlerhafte Zuweisung vergessen).
+**Aufwand:** ~4-5h.
+**Offen:** Drag&Drop-Funktion für Datei-Upload, Tagging/Umbenennen-Screen (Wireframes vorhanden), "Weiter"-Button + Hinweistext im Bulk-Upload, restliche fünf Unterseiten inhaltlich, `beforeunload`-Warnung für den Tagging-Screen, Design-Feinschliff (auf später verschoben).
+
 ## 2026-09-16 — Ordner-Auswahl, Vite, persistente Speicherung
 
 **Ziel:** Button-Funktionalität: nativen Ordner-Dialog öffnen und den gewählten Pfad dauerhaft speichern, damit er beim nächsten App-Start nicht erneut abgefragt werden muss.
