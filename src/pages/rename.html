@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiPa DB - Umbenennen</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <app-header></app-header>
+    <main class="rename">
+        <div class="rename-topbar">
+            <span class="rename-filename-label">Datei-Name:</span>
+            <div class="rename-topbar-row">
+                <div class="rename-filename">
+                    <span id="rename-original-name" class="rename-original-name"></span>
+                    <span class="rename-arrow">→</span>
+                    <input type="text" id="rename-new-name" class="rename-new-name-input" readonly>
+                    <button type="button" id="rename-edit-name-button" class="rename-edit-name-button" aria-label="Namen manuell bearbeiten">✎</button>
+                </div>
+                <label class="rename-next-toggle">
+                    <input type="checkbox" id="rename-show-next-checkbox">
+                    Nächstes Bild anzeigen
+                </label>
+            </div>
+        </div>
+
+        <div class="rename-image-box" id="rename-image-box">
+            <img id="rename-image" class="rename-image" alt="">
+        </div>
+
+        <div class="rename-fields">
+            <div class="rename-field">
+                <label for="rename-type-select">Art des Screenshots</label>
+                <select id="rename-type-select">
+                    <option value="protokoll">Protokoll</option>
+                </select>
+            </div>
+            <div class="rename-field">
+                <label for="rename-event-select">Event</label>
+                <select id="rename-event-select">
+                    <option value="" selected disabled>Event wählen</option>
+                </select>
+            </div>
+            <div class="rename-field rename-field--number">
+                <label for="rename-number-input">Nr.</label>
+                <input type="text" id="rename-number-input">
+            </div>
+            <button type="button" id="rename-next-button" class="btn btn-primary btn-shadow-inset">
+                Nächstes Bild
+            </button>
+        </div>
+    </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="rename.js"></script>
+</body>
+</html>

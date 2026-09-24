@@ -17,6 +17,15 @@
       <a id="nav-evaluate" href="evaluate.html" class="dashboard-tile btn btn-primary btn-shadow-inset">Daten auswerten</a>
       <a id="nav-export" href="export.html" class="dashboard-tile btn btn-primary btn-shadow-inset">Vault/Datenbank exportieren</a>
     </div>
+    <div class="vault-switcher">
+      <button type="button" id="vault-switcher-toggle" class="btn btn-primary" aria-expanded="false">📁 <span id="vault-switcher-current"></span></button>
+      <div class="vault-switcher-menu" id="vault-switcher-menu">
+          <div id="vault-list"></div>
+          <button type="button" id="vault-add-button" class="btn btn-primary">+ Neue Datenbank</button>
+          <button type="button" id="vault-manage-button" class="btn btn-primary">Datenbanken verwalten</button>
+      </div>
+  </div>
   </main>
+  <script type="module" src="dashboard.js"></script>
 </body>
 </html>

@@ -8,6 +8,8 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "store:default"
+    "store:default",
+    "fs:allow-read-text-file",
+    "fs:allow-read-dir"
   ]
 }

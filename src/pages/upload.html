@@ -12,23 +12,29 @@
     <main class="upload">
         <h1>Hochladen</h1>
         <div class="upload-box">
-            <div class="drag-drop-box">
+            <div id="drag-drop-box" class="drag-drop-box">
                 <div class="drag-drop-content">
                     <div class="file-grid"></div>
                     <div class="drag-drop-info">
-                        <div class="upload-icon">↑</div>
-                        <div class="drag-drop-text">
-                            <span>drag & drop</span>
+                        <div id="upload-info-text" class="upload-info-text">Du kannst auch noch mehr Dateien hinzufügen</div>
+                        <div class="drag-drop-info-interaction">
+                            <div class="upload-icon">↑</div>
+                            <div class="drag-drop-text">
+                                <span>drag & drop</span>
+                            </div>
+                            <div class="or-text">
+                                <span>oder</span>
+                            </div>
+                            <button type="button" id="upload-files-button" class="btn btn-primary btn-shadow-inset">
+                                <span data-i18n="start.upload-files-button">Finden und hochladen</span>
+                            </button>
                         </div>
-                        <div class="or-text">
-                            <span>oder</span>
-                        </div>
-                        <button type="button" id="upload-files-button" class="btn btn-primary btn-shadow-inset">
-                            <span data-i18n="start.upload-files-button">Finden und hochladen</span>
-                        </button>
                     </div>
                     
                 </div>
+            </div>
+            <div id="upload-next-button-box" class="upload-next-button-box">
+                <button type="button" id="upload-next-button" class="btn btn-primary btn-shadow-inset">Weiter und Dateinamen bearbeiten</button>
             </div>
         </div>
     </main>
