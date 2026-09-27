@@ -1,5 +1,24 @@
 # DEVLOG
 
+## 2026-09-27 — Transkribieren: Personen-Template und Eingabemaske
+
+**Ziel:** Zweite große Dashboard-Funktion umsetzen — Protokoll-Fotos in strukturierte Personen-Notizen transkribieren, als Ersatz für den bisherigen Obsidian-Templater-Workflow.
+
+**Umsetzung:**
+- Konfig: `Einstellungen/template-personen.md` (Feld-Katalog mit Kategorien/Typen/Optionen), abgeleitet aus dem Vergleich des bestehenden Templater-Skripts mit echten Garching-1/2-Personen-Notizen. `Personenordner`-Feld zu allen Projekt-Notizen ergänzt (Standort-Gruppen-Zuordnung, z. B. ReFuMoLab → Garching). `naming-rules.md` um `personen:`-Abschnitt erweitert.
+- App: `transcribe.html`/`.js` — Batch-Übersicht (offene Protokoll-Bilder pro Event, bereits transkribierte rausgefiltert), dynamisch aus der Konfig gebautes Formular (Kategorien, Einfachauswahl als Toggle-Buttons, Freitext-Listen, Screenshot-Verknüpfung mit Unterfeldern, automatische Verlinkung mitprotokollierter Personen über eine +100/+200-Konvention). Erste Seite, die tatsächlich Markdown-Dateien schreibt statt nur Bilder zu kopieren.
+
+**Entscheidungen:** Template als YAML-Konfig-Datei statt hartcodierter Felder in HTML, damit später weitere Templates möglich sind. Reale Garching-1/2-Daten als Grundlage statt blind dem (teilweise veralteten) Templater-Skript zu folgen — dabei aufgefallen: die Leitfrage-Liste im Garching-Template war fälschlich von MQ kopiert. Navigation zwischen Batch-Übersicht und Bearbeitung über normale Seiten-Navigation, nicht über ein eigenes Tauri-Fenster (ursprünglich missverstanden).
+
+**Probleme / Sackgassen:**
+- `freitext-liste`-Felder wurden bei der Zustands-Initialisierung fälschlich mit `""` statt `[]` befüllt, wodurch `renderForm()` beim ersten Aufruf abstürzte — dadurch wirkte es zunächst so, als würde das Bild nicht angezeigt.
+- Das eigentliche Bild-Problem war ein 403 vom `asset://`-Protokoll: die fs-Plugin-Scope (die `expand_scope` bisher erweitert hat) und die Asset-Protokoll-Scope sind in Tauri zwei komplett getrennte Scopes. Gelöst durch zusätzlichen `asset_protocol_scope()`-Aufruf in `expand_scope` (Rust-Änderung, braucht Neustart von `npm run tauri dev`).
+- Mehrere CSS-Anläufe für die Bild-Box: `max-width: 100%` in einer sich selbst schrumpfenden Box führt dazu, dass der Browser beim Berechnen der Box-Breite die volle Bildbreite statt der Prozentangabe einrechnet (bekannte CSS-Falle bei Prozent-Sizing kombiniert mit Shrink-to-fit). Letztlich per JS gelöst: Bildgröße wird nach dem Laden anhand von `naturalWidth`/`naturalHeight` und der verfügbaren Spaltengröße berechnet und direkt als Pixelgröße gesetzt.
+
+**Aufwand:** ~3h.
+
+**Offen:** Transkribieren ist grundsätzlich fertig, aber der eigentliche Speichervorgang (inkl. Mitprotokollierte-Personen-Verlinkung) noch nicht mit echten Daten durchgetestet. Restliche drei Dashboard-Unterseiten (Templates verwalten, Tagging, Auswerten, Export) weiterhin inhaltlich leer.
+
 ## 2026-09-27 — Screenshot-Dateityp: Referenzdaten im Vault + Umsetzung in der App
 
 **Ziel:** Zweiten Datei-Typ (Screenshot) neben Protokoll unterstützen, inklusive sauberer Referenzdaten im Vault (Projekte, Screenshot-Typen) statt einer Flat-Liste.

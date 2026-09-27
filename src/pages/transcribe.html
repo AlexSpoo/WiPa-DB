@@ -3,13 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WiPa DB - unterseite</title>
+  <title>WiPa DB - Transkribieren</title>
   <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
-    <main class="upload">
-        <h1>unterseite</h1>
-        <a href="dashboard.html">← Zurück</a>
+    <app-header></app-header>
+    <main class="transcribe">
+        <div class="transcribe-batches" id="transcribe-batches">
+            <h1>Protokolle transkribieren</h1>
+            <p id="transcribe-batches-empty" class="transcribe-batches-empty is-hidden">Keine offenen Protokoll-Bilder gefunden.</p>
+            <ul class="transcribe-batch-list" id="transcribe-batch-list"></ul>
+        </div>
+
+        <div class="transcribe-edit-view is-hidden" id="transcribe-edit-view">
+            <div class="transcribe-edit-header">
+                <div>
+                    <span id="transcribe-event-label" class="transcribe-event-label"></span>
+                    <span id="transcribe-image-name" class="transcribe-image-name"></span>
+                </div>
+                <button type="button" id="transcribe-back-to-batches" class="link-secondary">← Andere Auswahl</button>
+            </div>
+
+            <div class="transcribe-layout">
+                <div class="transcribe-form-column" id="transcribe-form"></div>
+                <div class="transcribe-image-column">
+                    <div class="transcribe-image-box">
+                        <img id="transcribe-image" class="transcribe-image" alt="">
+                    </div>
+                </div>
+            </div>
+
+            <div class="transcribe-actions">
+                <button type="button" id="transcribe-save-more-button" class="btn btn-primary btn-shadow-inset">
+                    Speichern &amp; weitere Person für dieses Protokoll
+                </button>
+                <button type="button" id="transcribe-next-button" class="btn btn-primary btn-shadow-inset">
+                    Speichern &amp; nächstes Bild
+                </button>
+            </div>
+        </div>
     </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="transcribe.js"></script>
 </body>
 </html>

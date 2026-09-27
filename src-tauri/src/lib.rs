@@ -1,8 +1,11 @@
+use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
 #[tauri::command]
 fn expand_scope(app_handle: tauri::AppHandle, folder_path: std::path::PathBuf) -> Result<(), String> {
   app_handle.fs_scope().allow_directory(&folder_path, true)
+    .map_err(|err| err.to_string())?;
+  app_handle.asset_protocol_scope().allow_directory(&folder_path, true)
     .map_err(|err| err.to_string())
 }
 
