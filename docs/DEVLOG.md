@@ -1,5 +1,26 @@
 # DEVLOG
 
+## 2026-09-27 — Screenshot-Dateityp: Referenzdaten im Vault + Umsetzung in der App
+
+**Ziel:** Zweiten Datei-Typ (Screenshot) neben Protokoll unterstützen, inklusive sauberer Referenzdaten im Vault (Projekte, Screenshot-Typen) statt einer Flat-Liste.
+
+**Umsetzung:**
+- Vault: `Projekte/*.md` (Name, Kürzel, ScreenshotPrefix) und `Typen/Screenshot-Typen/*.md` (Name, Kürzel, Englischer Name) als eigene Notizen angelegt, Namen gegen die echten Screenshot-Vorlage-Notizen im Vault verifiziert. Events verlinken ihr Projekt jetzt per Wikilink (`Projekt: "[[Projekt_X]]"`), `ScreenshotPrefix` aus den Events entfernt und in die Projekt-Notizen verschoben. `Dokumentation/Screenshot Codes.md` auf automatische Dataview-Tabellen umgestellt. `Media/Images/Screenshots(RAW)/` konsistent benannt, gemischter "MQ 1"-Ordner anhand der einzelnen Screenshot-Notizen auf zwei Events aufgeteilt.
+- App: `rename.html`/`rename.js` um Screenshot-Typ erweitert (Muster `{Event-Präfix}{Typ-Kürzel}-{Zahl}`, ohne `counterMax`). Neue Übersichtsseite am Ende des Umbenennen-Durchgangs: Liste aller Dateien mit Ergebnis-Name bzw. "Übersprungen"-Status, Einträge anklickbar zum Zurückspringen, Speichern erfolgt von dort aus.
+
+**Entscheidungen:** Projekte und Screenshot-Typen als eigene verlinkte Notizen statt Liste/Aufzählung — konsistent mit dem bestehenden Events/Personen-Muster ("richtige Referenzdatenbank"). Projekte bewusst nicht unter `Typen/` einsortiert, da kein Typ. Screenshot-Zähler ohne `counterMax`-Deckelung (anders als Protokoll).
+
+**Probleme / Sackgassen:**
+- Nach der Wikilink-Migration griff `resolveEventFolder`/`eventInfo` noch aufs rohe `Projekt`-Feld statt den Wikilink aufzulösen — hätte für alle Mosaiq-Events die falsche/leere ScreenshotPrefix geliefert. Vor dem ersten Test selbst gefunden und behoben.
+- Erstes umbenanntes Bild bekam keinen Präfix: `recomputeNumber()` setzte `state.event` nie, das passierte bisher nur beim Verlassen der Seite über `saveCurrentState()`.
+- Überspringen zählte die Nummer trotzdem hoch, weil `updateLastGoodState()` übersprungene Dateien nicht ausschloss.
+- Erster Versuch, Felder beim Klick auf "Überspringen" sofort zurückzusetzen, kollidierte mit `saveCurrentState()` beim Weiternavigieren und funktionierte nicht zuverlässig. Ersetzt durch "lazy reset beim Anzeigen" in `loadFile()` — robuster, weil es an einer einzigen Stelle greift statt über mehrere Klick-Handler verteilt zu sein.
+- Nach dem Reset ignorierte die Nummern-Berechnung andere, noch ungespeicherte Bilder im selben Batch (nur Dateien auf der Platte wurden gezählt) — ein neu bearbeitetes, vorher übersprungenes Bild bekam wieder Nummer 1. Behoben, indem `computeNextProtokollNumber`/`computeNextScreenshotNumber` jetzt zusätzlich die im laufenden Batch bereits vergebenen Nummern berücksichtigen.
+
+**Aufwand:** ~4h.
+
+**Offen:** Restliche vier Dashboard-Unterseiten (Transkribieren, Templates, Tagging, Auswerten, Export) inhaltlich leer. Weitere Datei-Typen (z. B. Post-it, Protokoll-Typen) bisher nur als spätere Idee erwähnt.
+
 ## 2026-09-24 — Multi-Vault-Verwaltung, Upload-Feinschliff, Umbenennen-Seite
 
 **Ziel:** Mehrere Vaults verwaltbar machen (Wechseln/Hinzufügen), Upload-Seite fertigstellen (Drag&Drop, Layout-Fixes), neue Umbenennen-Seite mit automatischer Protokoll-Nummerierung.

@@ -1,11 +1,21 @@
 import { load } from "@tauri-apps/plugin-store";
 import { basename } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 // Store elemente
 const store = await load("settings.json", { autoSave: false });
 const activeVault = await store.get("activeVault");
 const vaults = await store.get("vaults");
+await invoke("expand_scope", { folderPath: activeVault });
+
+const dashboardMessage = sessionStorage.getItem("dashboardMessage");
+if (dashboardMessage) {
+    sessionStorage.removeItem("dashboardMessage");
+    const messageBox = document.querySelector("#dashboard-message");
+    messageBox.textContent = dashboardMessage;
+    messageBox.classList.add("is-open");
+}
 
 // HTML elemente
 const toggle = document.querySelector("#vault-switcher-toggle");
@@ -25,6 +35,7 @@ for (const vault of otherVaults) {
     item.addEventListener("click", async () => {
         await store.set("activeVault", vault);
         await store.save();
+        await invoke("expand_scope", { folderPath: vault });
         window.location.reload();
     });
     vaultList.appendChild(item);
@@ -45,6 +56,7 @@ vaultAddButton.addEventListener("click", async () => {
         }
         await store.set("activeVault", folder);
         await store.save();
+        await invoke("expand_scope", { folderPath: folder });
         window.location.reload();
     }
 });

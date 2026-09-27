@@ -10,6 +10,9 @@
     "dialog:default",
     "store:default",
     "fs:allow-read-text-file",
-    "fs:allow-read-dir"
+    "fs:allow-read-dir",
+    "fs:allow-copy-file",
+    "fs:allow-mkdir",
+    "fs:allow-exists"
   ]
 }
