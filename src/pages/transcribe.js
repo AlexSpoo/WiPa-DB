@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
-import { readDir, readTextFile, writeTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
+import { readDir, readTextFile, writeTextFile, mkdir, exists, remove } from "@tauri-apps/plugin-fs";
 import { load as loadYaml } from "js-yaml";
 import { load as loadStore } from "@tauri-apps/plugin-store";
 
@@ -16,8 +16,30 @@ const formEl = document.querySelector("#transcribe-form");
 const imageEl = document.querySelector("#transcribe-image");
 const imageBoxEl = document.querySelector(".transcribe-image-box");
 const imageColumnEl = document.querySelector(".transcribe-image-column");
+const prevPersonButton = document.querySelector("#transcribe-prev-person-button");
 const saveMoreButton = document.querySelector("#transcribe-save-more-button");
 const nextButton = document.querySelector("#transcribe-next-button");
+const templatePickerBox = document.querySelector("#transcribe-template-picker");
+const templateSelect = document.querySelector("#transcribe-template-select");
+const lightboxEl = document.querySelector("#transcribe-lightbox");
+const lightboxImageEl = document.querySelector("#transcribe-lightbox-image");
+
+function openLightbox() {
+    if (!imageEl.src) return;
+    lightboxImageEl.src = imageEl.src;
+    lightboxEl.classList.remove("is-hidden");
+}
+
+function closeLightbox() {
+    lightboxEl.classList.add("is-hidden");
+    lightboxImageEl.src = "";
+}
+
+imageBoxEl.addEventListener("click", openLightbox);
+lightboxEl.addEventListener("click", closeLightbox);
+window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeLightbox();
+});
 
 // Ein <img> mit width/height:100% in einer sich selbst schrumpfenden Box lässt sich mit
 // reinem CSS nicht sauber begrenzen (der Browser rechnet beim Bestimmen der Box-Breite mit
@@ -40,8 +62,10 @@ const activeVault = await store.get("activeVault");
 await invoke("expand_scope", { folderPath: activeVault });
 
 const protokollDir = await join(activeVault, "Media", "Images", "Protokolle(RAW)");
+const screenshotsRawDir = await join(activeVault, "Media", "Images", "Screenshots(RAW)");
 const personenDir = await join(activeVault, "Personen");
 const screenshotsDir = await join(activeVault, "Screenshots");
+const templatesDir = await join(activeVault, "Einstellungen", "Templates");
 
 function extractWikilinkTarget(value) {
     if (typeof value !== "string") return null;
@@ -90,7 +114,49 @@ for (const entry of await readDir(eventsDir)) {
         projektName: projekt?.name ?? "",
         personenordner: projekt?.personenordner ?? "",
         orte: Array.isArray(data.Orte) ? data.Orte : (data.Orte ? [data.Orte] : []),
+        protokollTemplate: extractWikilinkTarget(data.ProtokollTemplate),
     };
+}
+
+// Bekannte Bereiche für "automatisch"-Felder mit Pfad wie "Event.Projekt.Name" —
+// dieselbe Registry wie in Templates verwalten, hier fürs tatsächliche Auflösen
+// beim Transkribieren gebraucht.
+const BEREICH_FOLDERS = { Event: eventsDir, Projekt: projekteDir };
+
+async function findNoteInKnownBereiche(name) {
+    for (const dir of Object.values(BEREICH_FOLDERS)) {
+        const path = await join(dir, `${name}.md`);
+        if (await exists(path)) return path;
+    }
+    return null;
+}
+
+// Läuft einen Pfad wie "Event.Projekt.Name" ab: erster Schritt ist der
+// Startbereich (aktuell immer das laufende Event), jeder weitere Schritt ist
+// ein Feldname; zeigt der Wert auf eine verlinkte Notiz und ist noch nicht das
+// letzte Segment, wird dort weitergelesen.
+async function resolveAutomaticValue(quelle) {
+    if (!quelle) return "";
+    const segments = quelle.split(".").filter(Boolean);
+    const startBereich = segments.shift();
+    if (startBereich !== "Event") return "";
+
+    let notePath = await join(eventsDir, `${currentBatch.info.fileName}.md`);
+    let data = await readFrontmatter(notePath);
+
+    for (let i = 0; i < segments.length; i++) {
+        const rawValue = data?.[segments[i]];
+        if (i === segments.length - 1) {
+            if (Array.isArray(rawValue)) return rawValue;
+            if (rawValue instanceof Date) return formatDate(rawValue);
+            return typeof rawValue === "string" ? rawValue : (rawValue ?? "");
+        }
+        const targetName = extractWikilinkTarget(rawValue);
+        const nextPath = targetName ? await findNoteInKnownBereiche(targetName) : null;
+        if (!nextPath) return "";
+        data = await readFrontmatter(nextPath);
+    }
+    return "";
 }
 
 function formatDate(value) {
@@ -101,9 +167,33 @@ function formatDate(value) {
     return `${year}-${month}-${day}`;
 }
 
-// Template-Konfiguration für die Personen-Eingabemaske
-const templateConfig = await readFrontmatter(await join(activeVault, "Einstellungen", "template-personen.md"));
-const templateFields = templateConfig.felder;
+// Template-Konfiguration für die Personen-Eingabemaske — wird pro Event aus dessen
+// zugewiesenem ProtokollTemplate geladen (Templates verwalten → Event-Zuordnung),
+// nicht mehr fest verdrahtet.
+let templateFields = [];
+
+async function loadTemplateFields(templateName) {
+    const filePath = await join(templatesDir, "Personen", `${templateName}.md`);
+    if (!(await exists(filePath))) return null;
+    const data = await readFrontmatter(filePath);
+    return data.felder ?? [];
+}
+
+async function listScreenshotTemplateNames() {
+    const dir = await join(templatesDir, "Screenshots");
+    if (!(await exists(dir))) return [];
+    return (await readDir(dir))
+        .filter((entry) => entry.isFile && entry.name.endsWith(".md"))
+        .map((entry) => entry.name.replace(/\.md$/, ""))
+        .sort();
+}
+
+async function loadScreenshotTemplateFields(templateName) {
+    const filePath = await join(templatesDir, "Screenshots", `${templateName}.md`);
+    if (!(await exists(filePath))) return [];
+    const data = await readFrontmatter(filePath);
+    return data.felder ?? [];
+}
 
 async function resolveEventFolder(baseDir, eventName) {
     const plainPath = await join(baseDir, eventName);
@@ -154,7 +244,7 @@ function nextBaseNumber(existingPersons, datum, digits) {
 
 // ---- Batch-Übersicht ----
 
-async function buildBatches() {
+async function buildPersonenBatches() {
     const batches = [];
     const usedImagesByOrdner = new Map();
 
@@ -179,9 +269,48 @@ async function buildBatches() {
         const openImages = images.filter((name) => !usedImages.has(name));
         if (openImages.length === 0) continue;
 
-        batches.push({ eventName, eventFolder, openImages, info });
+        const hasTemplate = info.protokollTemplate
+            ? await exists(await join(templatesDir, "Personen", `${info.protokollTemplate}.md`))
+            : false;
+
+        batches.push({ bereich: "Personen", eventName, eventFolder, openImages, info, hasTemplate });
     }
     return batches;
+}
+
+async function buildScreenshotBatches() {
+    const batches = [];
+
+    for (const eventName of Object.keys(eventInfo)) {
+        const info = eventInfo[eventName];
+        if (!info.personenordner) continue;
+
+        const eventFolder = await resolveEventFolder(screenshotsRawDir, eventName);
+        if (!(await exists(eventFolder))) continue;
+
+        const images = (await readDir(eventFolder))
+            .filter((entry) => entry.isFile && /\.(jpg|jpeg|png)$/i.test(entry.name))
+            .map((entry) => entry.name)
+            .sort();
+        if (images.length === 0) continue;
+
+        const openImages = [];
+        for (const imageName of images) {
+            const id = imageName.replace(/\.[^.]+$/, "");
+            const notePath = await join(screenshotsDir, info.personenordner, `Screenshot_${id}.md`);
+            if (!(await exists(notePath))) openImages.push(imageName);
+        }
+        if (openImages.length === 0) continue;
+
+        batches.push({ bereich: "Screenshots", eventName, eventFolder, openImages, info, hasTemplate: true });
+    }
+    return batches;
+}
+
+async function buildBatches() {
+    const personen = await buildPersonenBatches();
+    const screenshots = await buildScreenshotBatches();
+    return [...personen, ...screenshots];
 }
 
 function renderBatchList(batches) {
@@ -191,21 +320,30 @@ function renderBatchList(batches) {
     for (const batch of batches) {
         const item = document.createElement("li");
         item.className = "transcribe-batch-item";
-        item.textContent = `${batch.eventName} — ${batch.openImages.length} offene Protokoll-Bild(er)`;
-        item.addEventListener("click", () => {
-            window.location.href = `/pages/transcribe.html?event=${encodeURIComponent(batch.eventName)}`;
-        });
+        const label = batch.bereich === "Personen" ? "Protokoll-Bild(er)" : "Screenshot-Bild(er)";
+        if (!batch.hasTemplate) {
+            item.classList.add("is-disabled");
+            item.textContent = `${batch.eventName} — ${batch.bereich} — ${batch.openImages.length} offene ${label} (kein Protokoll-Template zugewiesen, siehe Templates verwalten → Event-Zuordnung)`;
+        } else {
+            item.textContent = `${batch.eventName} — ${batch.bereich} — ${batch.openImages.length} offene ${label}`;
+            item.addEventListener("click", () => {
+                window.location.href = `/pages/transcribe.html?event=${encodeURIComponent(batch.eventName)}&bereich=${encodeURIComponent(batch.bereich)}`;
+            });
+        }
         batchListEl.appendChild(item);
     }
 }
 
 // ---- Bearbeitungs-Ansicht ----
 
+let currentBereich = "Personen";
 let currentBatch = null;
 let currentImageIndex = 0;
 let currentImageState = null;
+let imageStates = [];
+let lastScreenshotTemplateName = "";
 
-function makeEmptyImageState() {
+function makePersonValues() {
     const values = {};
     for (const field of templateFields) {
         if (field.typ === "verknüpfung-mehrfach" || field.typ === "freitext-liste") {
@@ -214,32 +352,132 @@ function makeEmptyImageState() {
             values[field.name] = "";
         }
     }
-    return { values, savedPersons: [] };
+    return values;
 }
 
-async function startBatch(batch) {
+function isPersonBlank(values) {
+    return templateFields.every((field) => {
+        if (field.name === "Personennummer") return true;
+        const value = values[field.name];
+        return Array.isArray(value) ? value.length === 0 : !value;
+    });
+}
+
+function makeEmptyImageState() {
+    return { persons: [{ fileName: null, values: makePersonValues() }], personIndex: 0 };
+}
+
+function currentPerson() {
+    return currentImageState.persons[currentImageState.personIndex];
+}
+
+function currentValues() {
+    if (currentBereich === "Screenshots") return currentImageState.values;
+    return currentPerson().values;
+}
+
+async function startPersonenBatch(batch) {
+    currentBereich = "Personen";
     currentBatch = batch;
-    currentImageIndex = 0;
+    imageStates = new Array(batch.openImages.length).fill(null);
+    templateFields = await loadTemplateFields(batch.info.protokollTemplate);
+    templatePickerBox.classList.add("is-hidden");
+    saveMoreButton.classList.remove("is-hidden");
     batchesView.classList.add("is-hidden");
     editView.classList.remove("is-hidden");
-    eventLabelEl.textContent = `${batch.eventName} (${batch.info.projektName})`;
-    await loadImage();
+    eventLabelEl.textContent = `${batch.eventName} (${batch.info.projektName}) — Personen`;
+    await loadImage(0);
 }
 
-async function loadImage() {
-    currentImageState = makeEmptyImageState();
-    const fileName = currentBatch.openImages[currentImageIndex];
+// Zustand pro Bild bleibt für die ganze Batch-Sitzung erhalten (in imageStates),
+// damit man über "Zurück" zu bereits bearbeiteten Bildern/Personen zurückkommt,
+// statt dass sie beim Weitergehen verloren gehen.
+async function ensurePersonenImageState(index) {
+    if (imageStates[index]) return imageStates[index];
+
+    const rules = await loadNamingRules("personen");
+    const existingPersons = await loadExistingPersons(currentBatch.info.personenordner);
+    const baseNumber = nextBaseNumber(existingPersons, currentBatch.info.date, rules.counterDigits);
+
+    const state = makeEmptyImageState();
+    state.baseNumber = baseNumber;
+    state.rules = rules;
+    state.persons[0].values.Personennummer = baseNumber;
+
+    imageStates[index] = state;
+    return state;
+}
+
+// ---- Screenshots ----
+
+function makeEmptyScreenshotState() {
+    return { templateName: "", values: {} };
+}
+
+function applyScreenshotTemplateValues(state, templateName) {
+    state.templateName = templateName;
+    state.values = {};
+    for (const field of templateFields) {
+        state.values[field.name] = (field.typ === "freitext-liste" || field.typ === "verknüpfung-mehrfach") ? [] : "";
+    }
+}
+
+async function ensureScreenshotImageState(index) {
+    if (imageStates[index]) return imageStates[index];
+    const state = makeEmptyScreenshotState();
+    imageStates[index] = state;
+    return state;
+}
+
+async function startScreenshotBatch(batch) {
+    currentBereich = "Screenshots";
+    currentBatch = batch;
+    imageStates = new Array(batch.openImages.length).fill(null);
+    templateFields = [];
+    templatePickerBox.classList.remove("is-hidden");
+    saveMoreButton.classList.add("is-hidden");
+    batchesView.classList.add("is-hidden");
+    editView.classList.remove("is-hidden");
+    eventLabelEl.textContent = `${batch.eventName} (${batch.info.projektName}) — Screenshots`;
+
+    templateSelect.innerHTML = '<option value="" selected disabled>Typ wählen</option>';
+    for (const name of await listScreenshotTemplateNames()) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        templateSelect.appendChild(option);
+    }
+
+    await loadImage(0);
+}
+
+templateSelect.addEventListener("change", async () => {
+    templateFields = await loadScreenshotTemplateFields(templateSelect.value);
+    applyScreenshotTemplateValues(currentImageState, templateSelect.value);
+    lastScreenshotTemplateName = templateSelect.value;
+    await renderForm();
+});
+
+async function loadImage(index) {
+    currentImageIndex = index;
+    const fileName = currentBatch.openImages[index];
     imageNameEl.textContent = fileName;
     imageEl.src = convertFileSrc(await join(currentBatch.eventFolder, fileName));
 
-    const rules = await loadNamingRules("personen");
-    const datum = currentBatch.info.date;
-    const existingPersons = await loadExistingPersons(currentBatch.info.personenordner);
-    const baseNumber = nextBaseNumber(existingPersons, datum, rules.counterDigits);
-
-    currentImageState.baseNumber = baseNumber;
-    currentImageState.rules = rules;
-    currentImageState.values.Personennummer = baseNumber;
+    if (currentBereich === "Screenshots") {
+        currentImageState = await ensureScreenshotImageState(index);
+        if (!currentImageState.templateName && lastScreenshotTemplateName) {
+            templateFields = await loadScreenshotTemplateFields(lastScreenshotTemplateName);
+            applyScreenshotTemplateValues(currentImageState, lastScreenshotTemplateName);
+        } else {
+            templateFields = currentImageState.templateName
+                ? await loadScreenshotTemplateFields(currentImageState.templateName)
+                : [];
+        }
+        templateSelect.value = currentImageState.templateName;
+    } else {
+        currentImageState = await ensurePersonenImageState(index);
+    }
 
     await renderForm();
 }
@@ -266,11 +504,11 @@ function renderChoiceGroup(field, container) {
         button.type = "button";
         button.className = "transcribe-choice";
         button.textContent = option;
-        button.classList.toggle("is-selected", currentImageState.values[field.name] === option);
+        button.classList.toggle("is-selected", currentValues()[field.name] === option);
         button.addEventListener("click", () => {
-            currentImageState.values[field.name] = currentImageState.values[field.name] === option ? "" : option;
+            currentValues()[field.name] = currentValues()[field.name] === option ? "" : option;
             group.querySelectorAll(".transcribe-choice").forEach((btn) => {
-                btn.classList.toggle("is-selected", btn.textContent === currentImageState.values[field.name]);
+                btn.classList.toggle("is-selected", btn.textContent === currentValues()[field.name]);
             });
         });
         group.appendChild(button);
@@ -281,57 +519,77 @@ function renderChoiceGroup(field, container) {
 function renderTextField(field, container) {
     const input = document.createElement("input");
     input.type = "text";
-    input.value = currentImageState.values[field.name] ?? "";
+    input.value = currentValues()[field.name] ?? "";
     input.addEventListener("input", () => {
-        currentImageState.values[field.name] = input.value;
+        currentValues()[field.name] = input.value;
     });
     container.appendChild(input);
+}
+
+function autoResizeTextarea(textarea) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+// Mehrzeiliges Textfeld, das mit dem Inhalt mitwächst (Enter fügt eine neue
+// Zeile ein, statt das Formular abzuschicken oder abgeschnitten zu werden).
+function renderMultilineTextField(field, container) {
+    const textarea = document.createElement("textarea");
+    textarea.className = "transcribe-autogrow";
+    textarea.rows = 1;
+    textarea.value = currentValues()[field.name] ?? "";
+    textarea.addEventListener("input", () => {
+        currentValues()[field.name] = textarea.value;
+        autoResizeTextarea(textarea);
+    });
+    container.appendChild(textarea);
+    requestAnimationFrame(() => autoResizeTextarea(textarea));
 }
 
 function renderListField(field, container) {
     const textarea = document.createElement("textarea");
     textarea.rows = 3;
     textarea.placeholder = "ein Eintrag pro Zeile";
-    textarea.value = (currentImageState.values[field.name] ?? []).join("\n");
+    textarea.value = (currentValues()[field.name] ?? []).join("\n");
     textarea.addEventListener("input", () => {
-        currentImageState.values[field.name] = textarea.value.split("\n").map((line) => line.trim()).filter(Boolean);
+        currentValues()[field.name] = textarea.value.split("\n").map((line) => line.trim()).filter(Boolean);
     });
     container.appendChild(textarea);
 }
 
+// Generisch: liest field.quelle (z. B. "Event.Ort" oder "Event.Projekt.Name") aus
+// den echten Notizen aus, statt einzelne Feldnamen im Code fest zu verdrahten.
 async function renderAutomaticField(field, container) {
-    if (field.quelle === "Event" && field.name === "Datum") {
+    const resolved = await resolveAutomaticValue(field.quelle);
+
+    if (Array.isArray(resolved) && resolved.length > 1) {
+        const select = document.createElement("select");
+        for (const option of resolved) {
+            const optionEl = document.createElement("option");
+            optionEl.value = option;
+            optionEl.textContent = option;
+            select.appendChild(optionEl);
+        }
+        currentValues()[field.name] = currentValues()[field.name] || resolved[0];
+        select.value = currentValues()[field.name];
+        select.addEventListener("change", () => {
+            currentValues()[field.name] = select.value;
+        });
+        container.appendChild(select);
+        return;
+    }
+
+    const value = Array.isArray(resolved) ? (resolved[0] ?? "") : resolved;
+    currentValues()[field.name] = currentValues()[field.name] || value;
+
+    if (field.editierbar) {
+        renderTextField(field, container);
+    } else {
         const span = document.createElement("div");
         span.className = "transcribe-static";
-        span.textContent = currentBatch.info.date;
+        span.textContent = currentValues()[field.name];
         container.appendChild(span);
-        return;
     }
-
-    if (field.quelle === "Event" && field.name === "Ort") {
-        const orte = currentBatch.info.orte;
-        if (orte.length > 1) {
-            const select = document.createElement("select");
-            for (const ort of orte) {
-                const option = document.createElement("option");
-                option.value = ort;
-                option.textContent = ort;
-                select.appendChild(option);
-            }
-            currentImageState.values[field.name] = currentImageState.values[field.name] || orte[0];
-            select.value = currentImageState.values[field.name];
-            select.addEventListener("change", () => {
-                currentImageState.values[field.name] = select.value;
-            });
-            container.appendChild(select);
-        } else {
-            currentImageState.values[field.name] = currentImageState.values[field.name] || orte[0] || "";
-            renderTextField(field, container);
-        }
-        return;
-    }
-
-    renderTextField(field, container);
 }
 
 function renderScreenshotField(field, container) {
@@ -340,7 +598,7 @@ function renderScreenshotField(field, container) {
 
     function renderEntries() {
         list.innerHTML = "";
-        for (const [index, entry] of currentImageState.values[field.name].entries()) {
+        for (const [index, entry] of currentValues()[field.name].entries()) {
             const card = document.createElement("div");
             card.className = "transcribe-screenshot-card";
 
@@ -352,7 +610,7 @@ function renderScreenshotField(field, container) {
             removeButton.className = "link-secondary";
             removeButton.textContent = "entfernen";
             removeButton.addEventListener("click", () => {
-                currentImageState.values[field.name].splice(index, 1);
+                currentValues()[field.name].splice(index, 1);
                 renderEntries();
             });
             title.appendChild(removeButton);
@@ -420,7 +678,7 @@ function renderScreenshotField(field, container) {
     addButton.textContent = "+ Screenshot hinzufügen";
 
     loadUnlinkedScreenshots(currentBatch.info.personenordner).then((screenshots) => {
-        const alreadyAdded = new Set(currentImageState.values[field.name].map((entry) => entry.fileName));
+        const alreadyAdded = new Set(currentValues()[field.name].map((entry) => entry.fileName));
         const available = screenshots.filter((s) => !alreadyAdded.has(s.fileName));
         if (available.length === 0) {
             select.disabled = true;
@@ -443,7 +701,7 @@ function renderScreenshotField(field, container) {
         for (const sub of field.unterfelder) {
             entry[sub.name] = sub.typ === "freitext-liste" ? [] : "";
         }
-        currentImageState.values[field.name].push(entry);
+        currentValues()[field.name].push(entry);
         renderEntries();
         select.querySelector(`option[value="${select.value}"]`)?.remove();
     });
@@ -455,9 +713,18 @@ function renderScreenshotField(field, container) {
 function renderCompanionsField(field, container) {
     const info = document.createElement("div");
     info.className = "transcribe-static";
-    const names = currentImageState.savedPersons.map((p) => p.fileName);
+    const names = currentImageState.persons
+        .filter((_, index) => index !== currentImageState.personIndex)
+        .map((p) => p.fileName ?? "(noch nicht gespeichert)");
     info.textContent = names.length > 0 ? names.join(", ") : "wird automatisch verknüpft, sobald es weitere Personen für dieses Protokoll gibt";
     container.appendChild(info);
+}
+
+function updatePersonNavButtons() {
+    const canGoBack = currentBereich === "Screenshots"
+        ? currentImageIndex > 0
+        : currentImageState.personIndex > 0 || currentImageIndex > 0;
+    prevPersonButton.classList.toggle("is-hidden", !canGoBack);
 }
 
 async function renderForm() {
@@ -487,7 +754,7 @@ async function renderForm() {
             } else if (field.typ === "automatisch-zahl") {
                 renderTextField(field, wrapper);
             } else if (field.typ === "text") {
-                renderTextField(field, wrapper);
+                renderMultilineTextField(field, wrapper);
             } else if (field.typ === "einfachauswahl") {
                 renderChoiceGroup(field, wrapper);
             } else if (field.typ === "freitext-liste") {
@@ -503,6 +770,8 @@ async function renderForm() {
 
         formEl.appendChild(fieldset);
     }
+
+    updatePersonNavButtons();
 }
 
 function yamlScalar(value) {
@@ -512,9 +781,7 @@ function yamlScalar(value) {
 }
 
 // Markdown-Erzeugung fürs Speichern einer Person-Notiz
-async function writePersonNote(state, personNumber, companions) {
-    const v = state.values;
-    const fileName = `Person_${currentBatch.info.date}_${personNumber}`;
+async function writePersonNote(v, fileName, companions) {
     const imageFileName = currentBatch.openImages[currentImageIndex];
 
     const lines = [];
@@ -612,55 +879,131 @@ async function updateScreenshotNote(entry, personFileName) {
     await writeTextFile(filePath, `---\n${updated.join("\n")}\n---${body}`);
 }
 
-async function addCompanionLink(fileName, companionFileName) {
-    const filePath = await join(personenDir, currentBatch.info.personenordner, `${fileName}.md`);
-    const raw = await readTextFile(filePath);
-    const relatedIndex = raw.indexOf("Related Protokolle:");
-    let insertAt = raw.indexOf("\n", relatedIndex) + 1;
-    while (raw.startsWith("  - ", insertAt)) {
-        insertAt = raw.indexOf("\n", insertAt) + 1;
+// Speichert alle Personen dieses Protokoll-Bilds neu (idempotent) — so bleiben die
+// gegenseitigen "Related Protokolle"-Verlinkungen immer konsistent, egal in welcher
+// Reihenfolge zurück-/vorgegangen und editiert wurde. Noch leere, nie gespeicherte
+// Personen (z. B. ein per "weitere Person" angelegter, aber unausgefüllter Slot)
+// werden übersprungen, damit keine leeren Dateien entstehen.
+async function saveGroup() {
+    const toSave = currentImageState.persons.filter((p) => p.fileName || !isPersonBlank(p.values));
+    const resolved = toSave.map((person) => ({
+        person,
+        oldFileName: person.fileName,
+        newFileName: `Person_${currentBatch.info.date}_${person.values.Personennummer}`,
+    }));
+
+    for (const entry of resolved) {
+        const companions = resolved.filter((other) => other !== entry).map((other) => other.newFileName);
+        await writePersonNote(entry.person.values, entry.newFileName, companions);
+        if (entry.oldFileName && entry.oldFileName !== entry.newFileName) {
+            await remove(await join(personenDir, currentBatch.info.personenordner, `${entry.oldFileName}.md`));
+        }
+        entry.person.fileName = entry.newFileName;
     }
-    const before = raw.slice(0, insertAt);
-    const after = raw.slice(insertAt);
-    await writeTextFile(filePath, `${before}  - "[[${companionFileName}]]"\n${after}`);
 }
 
-async function savePerson() {
-    const state = currentImageState;
-    const companionOffset = state.rules.mitprotokollierteOffset;
-    const personNumber = state.savedPersons.length === 0
-        ? state.baseNumber
-        : String(parseInt(state.baseNumber, 10) + companionOffset * state.savedPersons.length).padStart(state.rules.counterDigits, "0");
+async function goToPerson(index) {
+    await saveGroup();
+    currentImageState.personIndex = index;
+    await renderForm();
+}
 
-    const companionFileNames = state.savedPersons.map((p) => p.fileName);
-    const fileName = await writePersonNote(state, personNumber, companionFileNames);
+// Markdown-Erzeugung fürs Speichern einer Screenshot-Notiz. Die Grunddaten (ID,
+// Bild, Vorlage) sind fest, die restlichen Felder kommen komplett aus dem
+// gewählten Screenshot-Template — nichts davon ist im Code hartcodiert.
+async function saveScreenshotNote() {
+    if (!currentImageState.templateName) return false;
 
-    for (const previous of state.savedPersons) {
-        await addCompanionLink(previous.fileName, fileName);
+    const imageFileName = currentBatch.openImages[currentImageIndex];
+    const id = imageFileName.replace(/\.[^.]+$/, "");
+    const v = currentImageState.values;
+
+    const lines = ["---"];
+    lines.push(`ID: ${id}`);
+    lines.push(`Screenshot Bild: "[[${imageFileName}]]"`);
+    lines.push(`Screenshot Vorlage: "[[Screenshot-Typ_${currentImageState.templateName}]]"`);
+
+    for (const field of templateFields) {
+        const value = v[field.name];
+        if (field.typ === "freitext-liste") {
+            lines.push(`${field.name}:`);
+            for (const item of value ?? []) lines.push(`  - ${yamlScalar(item)}`);
+        } else {
+            lines.push(`${field.name}: ${yamlScalar(value)}`);
+        }
     }
 
-    state.savedPersons.push({ fileName, number: personNumber });
-    return fileName;
+    lines.push("Zusätzliche Anmerkungen:");
+    lines.push("Person:");
+    lines.push("PositionZeitstrahl:");
+    lines.push("Wahrscheinlichkeit:");
+    lines.push("Einordnung:");
+    lines.push("InterpretationenDesScreenshots:");
+    lines.push("---");
+    lines.push("");
+    lines.push(`![[${imageFileName}|500]]`);
+
+    const dir = await join(screenshotsDir, currentBatch.info.personenordner);
+    await mkdir(dir, { recursive: true });
+    await writeTextFile(await join(dir, `Screenshot_${id}.md`), lines.join("\n"));
+    return true;
 }
+
+prevPersonButton.addEventListener("click", async () => {
+    if (currentBereich === "Screenshots") {
+        if (currentImageIndex === 0) return;
+        await loadImage(currentImageIndex - 1);
+        return;
+    }
+
+    if (currentImageState.personIndex > 0) {
+        await goToPerson(currentImageState.personIndex - 1);
+        return;
+    }
+    if (currentImageIndex === 0) return;
+
+    await saveGroup();
+    await loadImage(currentImageIndex - 1);
+    currentImageState.personIndex = currentImageState.persons.length - 1;
+    await renderForm();
+});
 
 saveMoreButton.addEventListener("click", async () => {
-    await savePerson();
-    currentImageState.values = makeEmptyImageState().values;
-    currentImageState.values.Personennummer = String(
-        parseInt(currentImageState.baseNumber, 10) + currentImageState.rules.mitprotokollierteOffset * currentImageState.savedPersons.length
-    ).padStart(currentImageState.rules.counterDigits, "0");
+    const state = currentImageState;
+    if (state.personIndex < state.persons.length - 1) {
+        await goToPerson(state.personIndex + 1);
+        return;
+    }
+
+    await saveGroup();
+    const nextNumber = String(
+        parseInt(state.baseNumber, 10) + state.rules.mitprotokollierteOffset * state.persons.length
+    ).padStart(state.rules.counterDigits, "0");
+    const values = makePersonValues();
+    values.Personennummer = nextNumber;
+    state.persons.push({ fileName: null, values });
+    state.personIndex = state.persons.length - 1;
     await renderForm();
 });
 
 nextButton.addEventListener("click", async () => {
-    await savePerson();
-    currentBatch.openImages.splice(currentImageIndex, 1);
-    if (currentBatch.openImages.length === 0) {
+    if (currentBereich === "Screenshots") {
+        const saved = await saveScreenshotNote();
+        if (!saved) return;
+        if (currentImageIndex + 1 >= currentBatch.openImages.length) {
+            window.location.href = "/pages/transcribe.html";
+            return;
+        }
+        await loadImage(currentImageIndex + 1);
+        return;
+    }
+
+    await saveGroup();
+    if (currentImageIndex + 1 >= currentBatch.openImages.length) {
         window.location.href = "/pages/transcribe.html";
         return;
     }
-    if (currentImageIndex >= currentBatch.openImages.length) currentImageIndex = currentBatch.openImages.length - 1;
-    await loadImage();
+    await loadImage(currentImageIndex + 1);
 });
 
 backToBatchesButton.addEventListener("click", () => {
@@ -668,24 +1011,26 @@ backToBatchesButton.addEventListener("click", () => {
 });
 
 async function refreshBatches() {
-    batchesEmptyEl.textContent = "Lade Protokoll-Bilder …";
+    batchesEmptyEl.textContent = "Lade Bilder …";
     batchesEmptyEl.classList.remove("is-hidden");
     batchListEl.innerHTML = "";
     const batches = await buildBatches();
-    batchesEmptyEl.textContent = "Keine offenen Protokoll-Bilder gefunden.";
+    batchesEmptyEl.textContent = "Keine offenen Bilder gefunden.";
     renderBatchList(batches);
 }
 
 const urlParams = new URLSearchParams(window.location.search);
 const preselectedEvent = urlParams.get("event");
+const preselectedBereich = urlParams.get("bereich") === "Screenshots" ? "Screenshots" : "Personen";
 
 if (preselectedEvent) {
-    const batches = await buildBatches();
+    const batches = preselectedBereich === "Screenshots" ? await buildScreenshotBatches() : await buildPersonenBatches();
     const batch = batches.find((b) => b.eventName === preselectedEvent);
     if (batch) {
-        await startBatch(batch);
+        if (preselectedBereich === "Screenshots") await startScreenshotBatch(batch);
+        else await startPersonenBatch(batch);
     } else {
-        batchesEmptyEl.textContent = "Für dieses Event gibt es keine offenen Protokoll-Bilder mehr.";
+        batchesEmptyEl.textContent = "Für dieses Event gibt es keine offenen Bilder mehr.";
         batchesEmptyEl.classList.remove("is-hidden");
     }
 } else {

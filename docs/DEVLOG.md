@@ -1,5 +1,45 @@
 # DEVLOG
 
+## 2026-09-28 — Templates verwalten: generisches Template-System
+
+**Ziel:** Statt eines fest verdrahteten Personen-Templates ein generisches System, mit dem beliebige Template-Kategorien (Personen, Screenshots, künftig weitere) über die App selbst angelegt und bearbeitet werden können — inklusive automatischer Feld-Befüllung ohne hartcodierte Feldnamen im Code.
+
+**Umsetzung:**
+- Neue Seite `templates.html`/`.js`: Kategorien/Templates auflisten, Feldkatalog editieren (Name, Formular-Abschnitt, Typ, typspezifische Zusatzangaben wie Optionen oder Unterfelder).
+- Screenshot-Typ-Anbindung: Template unter Kategorie "Screenshots" anlegen erstellt/verknüpft automatisch die zugehörige Screenshot-Typ-Notiz (Kürzel, Englischer Name, `Template:`-Verweis).
+- Event-Zuordnung: pro Event ein Protokoll-Template zuweisen (wird beim Transkribieren automatisch geladen) sowie informativ gültige Screenshot-Typen vermerken (ohne die Auswahl beim Transkribieren einzuschränken).
+- `automatisch`-Felder generalisiert: statt hartcodierter Prüfung auf Feldnamen "Datum"/"Ort" gibt es jetzt eine Pfad-Auswahl (z. B. Event → Projekt → Name), die sich live an echten Beispiel-Notizen orientiert und beim Transkribieren generisch aufgelöst wird.
+- `template-personen.md` migriert nach `Einstellungen/Templates/Personen/Standard.md`.
+
+**Entscheidungen:** Bewusst keine volle Generizität für Bereichs-Ordner (Events, Projekte bleiben fest im Code verankert) — nur die Feld-Auflösung selbst ist generisch. Eine vollständige "Datei-Arten"-Registry (auch Ordner-Zuordnung konfigurierbar) wäre der nächste Ausbauschritt, aber bewusst zurückgestellt.
+
+**Probleme / Sackgassen:** Erster Ansatz für "automatisch" sollte laut Nutzer sicherstellen, dass gar nichts bereichsspezifisch hartcodiert ist — nach Abwägung des Aufwands (würde eine volle Datei-Arten-Registry brauchen) auf eine abgespeckte, aber noch generische Version geeinigt.
+
+**Aufwand:** ~4h.
+
+**Offen:** Volle Datei-Arten-Registry (Ordner-Zuordnung generisch statt fest im Code), Poster/Post-its-Integration, restliche Dashboard-Unterseiten.
+
+## 2026-09-28 — Transkribieren: Mehrpersonen-Navigation, Zoom, Screenshots-Unterstützung
+
+**Ziel:** Bugs aus dem ersten Transkribieren-Test beheben und die Seite bereichsübergreifend (Personen + Screenshots) statt nur für Personen nutzbar machen.
+
+**Umsetzung:**
+- CSS-Bug behoben (`.is-hidden` bekam `!important`, da eine spätere, spezifischere Regel sie überstimmt hatte — Ursache für verirrte Buttons auf der Übersicht).
+- Personennummer wird beim Speichern jetzt aus dem tatsächlichen Formularfeld gelesen statt neu berechnet.
+- Personen-Verwaltung pro Bild umgebaut: Zustand aller Bilder einer Batch-Sitzung bleibt erhalten (`imageStates`), "Zurück" navigiert jetzt bild- und personenübergreifend, `saveGroup()` schreibt bei jeder Navigation alle Personen eines Protokolls neu (inkl. Nummern-Änderung mit Umbenennung der Datei).
+- Bild-Zoom: Klick aufs Protokollbild öffnet eine vergrößerte, scrollbare Ansicht.
+- Dropdown-Styling vereinheitlicht (Renamer-Look) für die ganze App.
+- Screenshots transkribieren funktioniert jetzt: 1:1 pro Bild, Typ-Dropdown pro Bild (merkt sich die letzte Wahl als Vorschlag), generisches Formular aus dem gewählten Screenshot-Template.
+- Textfelder wachsen jetzt mit dem Inhalt mit (mehrzeilige Eingabe möglich).
+
+**Entscheidungen:** Bild-Box-Größe wird per JS anhand von `naturalWidth`/`naturalHeight` berechnet statt per CSS, weil `max-width: 100%` in einer sich selbst schrumpfenden Box eine bekannte CSS-Falle ist (Browser rechnet mit der vollen Bildbreite, bevor die Prozentangabe greifen kann).
+
+**Probleme / Sackgassen:** "Screenshots werden nicht gefunden" stellte sich als Eigenschaft der Testdaten heraus (kopierte echte Notizen mit bereits gesetztem `Person`-Feld), nicht als Bug.
+
+**Aufwand:** ~4h.
+
+**Offen:** Poster/Post-its weiterhin nicht angebunden.
+
 ## 2026-09-27 — Transkribieren: Personen-Template und Eingabemaske
 
 **Ziel:** Zweite große Dashboard-Funktion umsetzen — Protokoll-Fotos in strukturierte Personen-Notizen transkribieren, als Ersatz für den bisherigen Obsidian-Templater-Workflow.

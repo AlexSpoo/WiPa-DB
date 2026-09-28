@@ -10,8 +10,8 @@
     <app-header></app-header>
     <main class="transcribe">
         <div class="transcribe-batches" id="transcribe-batches">
-            <h1>Protokolle transkribieren</h1>
-            <p id="transcribe-batches-empty" class="transcribe-batches-empty is-hidden">Keine offenen Protokoll-Bilder gefunden.</p>
+            <h1>Transkribieren</h1>
+            <p id="transcribe-batches-empty" class="transcribe-batches-empty is-hidden">Keine offenen Bilder gefunden.</p>
             <ul class="transcribe-batch-list" id="transcribe-batch-list"></ul>
         </div>
 
@@ -21,7 +21,14 @@
                     <span id="transcribe-event-label" class="transcribe-event-label"></span>
                     <span id="transcribe-image-name" class="transcribe-image-name"></span>
                 </div>
-                <button type="button" id="transcribe-back-to-batches" class="link-secondary">← Andere Auswahl</button>
+                <button type="button" id="transcribe-back-to-batches" class="link-secondary">← Zurück zur Übersicht</button>
+            </div>
+
+            <div class="transcribe-field transcribe-template-picker is-hidden" id="transcribe-template-picker">
+                <label for="transcribe-template-select">Screenshot-Typ</label>
+                <select id="transcribe-template-select">
+                    <option value="" selected disabled>Typ wählen</option>
+                </select>
             </div>
 
             <div class="transcribe-layout">
@@ -34,6 +41,9 @@
             </div>
 
             <div class="transcribe-actions">
+                <button type="button" id="transcribe-prev-person-button" class="btn btn-primary btn-shadow-inset is-hidden">
+                    ← Zurück
+                </button>
                 <button type="button" id="transcribe-save-more-button" class="btn btn-primary btn-shadow-inset">
                     Speichern &amp; weitere Person für dieses Protokoll
                 </button>
@@ -41,6 +51,10 @@
                     Speichern &amp; nächstes Bild
                 </button>
             </div>
+        </div>
+
+        <div class="transcribe-lightbox is-hidden" id="transcribe-lightbox">
+            <img id="transcribe-lightbox-image" alt="">
         </div>
     </main>
     <script type="module" src="/shared/app-header.js"></script>

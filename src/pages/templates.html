@@ -3,13 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WiPa DB - unterseite</title>
+  <title>WiPa DB - Templates</title>
   <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
-    <main class="upload">
-        <h1>unterseite</h1>
-        <a href="dashboard.html">← Zurück</a>
+    <app-header></app-header>
+    <main class="templates">
+        <div class="templates-list-view" id="templates-list-view">
+            <div class="templates-list-header">
+                <h1>Templates verwalten</h1>
+                <button type="button" id="templates-goto-events-button" class="link-secondary">Event-Zuordnung →</button>
+            </div>
+            <div class="templates-bereiche" id="templates-bereiche"></div>
+
+            <div class="templates-new-box">
+                <div class="transcribe-field">
+                    <label for="templates-new-bereich">Bereich</label>
+                    <input list="templates-bereich-options" id="templates-new-bereich" placeholder="z. B. Personen, Screenshots, ...">
+                    <datalist id="templates-bereich-options"></datalist>
+                </div>
+                <div class="transcribe-field">
+                    <label for="templates-new-name">Name</label>
+                    <input id="templates-new-name" placeholder="z. B. Standard, Chat, ...">
+                </div>
+                <button type="button" id="templates-new-button" class="btn btn-primary btn-shadow-inset">+ Neues Template</button>
+            </div>
+        </div>
+
+        <div class="templates-editor-view is-hidden" id="templates-editor-view">
+            <div class="templates-editor-header">
+                <div>
+                    <span id="templates-editor-bereich" class="transcribe-event-label"></span>
+                    <input id="templates-editor-name" class="templates-editor-name-input">
+                </div>
+                <button type="button" id="templates-back-button" class="link-secondary">← Zurück zur Übersicht</button>
+            </div>
+
+            <div class="templates-screenshot-typ-box is-hidden" id="templates-screenshot-typ-box">
+                <div class="transcribe-field">
+                    <label for="templates-typ-kuerzel">Kürzel (Screenshot-Typ)</label>
+                    <input id="templates-typ-kuerzel" placeholder="z. B. C">
+                </div>
+                <div class="transcribe-field">
+                    <label for="templates-typ-englisch">Englischer Name (Screenshot-Typ)</label>
+                    <input id="templates-typ-englisch" placeholder="z. B. Chat">
+                </div>
+            </div>
+
+            <div class="templates-fields" id="templates-fields"></div>
+
+            <div class="templates-actions">
+                <span id="templates-save-message" class="templates-save-message is-hidden">Gespeichert.</span>
+                <button type="button" id="templates-add-field-button" class="btn btn-primary btn-shadow-inset">+ Feld hinzufügen</button>
+                <button type="button" id="templates-save-button" class="btn btn-primary btn-shadow-inset">Speichern</button>
+            </div>
+        </div>
+
+        <div class="templates-events-view is-hidden" id="templates-events-view">
+            <div class="templates-editor-header">
+                <h1>Event-Zuordnung</h1>
+                <button type="button" id="templates-events-back-button" class="link-secondary">← Zurück zur Übersicht</button>
+            </div>
+
+            <div class="transcribe-field">
+                <label for="templates-event-select">Event</label>
+                <select id="templates-event-select">
+                    <option value="" selected disabled>Event wählen</option>
+                </select>
+            </div>
+
+            <div class="templates-event-detail is-hidden" id="templates-event-detail">
+                <div class="transcribe-field">
+                    <label for="templates-event-protokoll-template">Protokoll-Template</label>
+                    <select id="templates-event-protokoll-template">
+                        <option value="">(keins)</option>
+                    </select>
+                </div>
+
+                <div class="transcribe-field">
+                    <label>Gültige Screenshot-Typen</label>
+                    <div class="templates-typen-checklist" id="templates-typen-checklist"></div>
+                </div>
+
+                <div class="templates-actions">
+                    <span id="templates-event-save-message" class="templates-save-message is-hidden">Gespeichert.</span>
+                    <button type="button" id="templates-event-save-button" class="btn btn-primary btn-shadow-inset">Speichern</button>
+                </div>
+            </div>
+        </div>
     </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="templates.js"></script>
 </body>
 </html>
