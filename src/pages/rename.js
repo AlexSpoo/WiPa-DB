@@ -181,14 +181,21 @@ async function computeNextProtokollNumber(eventName, date, rules) {
 }
 
 async function computeNextScreenshotNumber(eventName, typeKürzel, screenshotType, rules) {
-    const eventPath = await resolveEventFolder(screenshotDir, eventName);
     const prefix = eventInfo[eventName]?.screenshotPrefix ?? "";
+    const projektName = eventInfo[eventName]?.projektName;
 
     let highest = 0;
+    const pattern = new RegExp(`^${prefix}${typeKürzel}-(\\d+)`);
 
-    if (await exists(eventPath)) {
+    // Präfix + Kürzel sind pro Projekt fest, nicht pro Event — die Nummerierung
+    // ist also projektweit eindeutig. Deshalb über alle Events desselben
+    // Projekts scannen (z. B. Garching 1 UND 2), sonst können zwei Events
+    // versehentlich dieselbe Nummer vergeben.
+    const relatedEventNames = Object.keys(eventInfo).filter((name) => eventInfo[name]?.projektName === projektName);
+    for (const relatedEventName of relatedEventNames) {
+        const eventPath = await resolveEventFolder(screenshotDir, relatedEventName);
+        if (!(await exists(eventPath))) continue;
         const files = await readDir(eventPath);
-        const pattern = new RegExp(`^${prefix}${typeKürzel}-(\\d+)`);
         for (const file of files) {
             const match = file.name.match(pattern);
             if (!match) continue;
@@ -197,7 +204,9 @@ async function computeNextScreenshotNumber(eventName, typeKürzel, screenshotTyp
         }
     }
 
-    const batchHighest = highestBatchNumber((state) => state.type === "screenshot" && state.event === eventName && state.screenshotType === screenshotType);
+    const batchHighest = highestBatchNumber((state) =>
+        state.type === "screenshot" && eventInfo[state.event]?.projektName === projektName && state.screenshotType === screenshotType
+    );
     if (batchHighest > highest) highest = batchHighest;
 
     return String(highest + 1).padStart(rules.counterDigits, "0");

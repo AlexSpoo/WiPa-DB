@@ -3,13 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WiPa DB - unterseite</title>
+  <title>WiPa DB - Auswerten</title>
   <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
-    <main class="upload">
-        <h1>unterseite</h1>
-        <a href="dashboard.html">← Zurück</a>
+    <app-header></app-header>
+    <main class="evaluate">
+        <h1>Daten auswerten</h1>
+
+        <div class="evaluate-controls">
+            <div class="transcribe-field">
+                <label for="evaluate-bereich-select">Bereich</label>
+                <select id="evaluate-bereich-select">
+                    <option value="Personen">Personen</option>
+                    <option value="Screenshots">Screenshots</option>
+                </select>
+            </div>
+            <span id="evaluate-count" class="evaluate-count"></span>
+            <button type="button" id="evaluate-export-button" class="btn btn-primary btn-shadow-inset">Als CSV exportieren</button>
+        </div>
+
+        <div class="evaluate-table-wrapper">
+            <table id="evaluate-table" class="evaluate-table"></table>
+        </div>
     </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="evaluate.js"></script>
 </body>
 </html>

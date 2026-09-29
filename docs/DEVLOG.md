@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-09-29 — Daten auswerten, erster Testdurchlauf, Bugfixes aus dem Testfeedback
+
+**Ziel:** Erste vollständige, abgabefähige Version fertigstellen — Datenbank-Listenansicht mit CSV-Export ergänzen, dann per komplettem Testdurchlauf verifizieren und die dabei gefundenen Probleme beheben.
+
+**Umsetzung:**
+- Neue Seite `evaluate.html`/`.js` ("Daten auswerten"): Tabellenansicht aller Personen-/Screenshot-Notizen (Spalten = alle vorkommenden Frontmatter-Felder), CSV-Export mit BOM für Excel.
+- Fehlende Templates ergänzt: Personen-Templates `IAA` und `Mosaiq` (eigene Leitfragen/Personengruppe je nach echten Projektdaten), 11 fehlende Screenshot-Templates (Felder aus echten Beispiel-Notizen), allen 8 Events ein `ProtokollTemplate` zugewiesen.
+- Kompletter Testdurchlauf (Upload → Umbenennen → Templates verwalten → Transkribieren Personen/Screenshots → Auswerten) ergab 5 Fehlermeldungen, alle behoben:
+  - Kritischer Bug gefunden: mehrzeilige Textfelder wurden beim Speichern nicht als YAML maskiert → kaputte Notizen. War die eigentliche Ursache für zwei der gemeldeten Symptome ("keine Screenshots wählbar", "Umschalten in Auswerten geht nicht").
+  - MOSAIQ-Notizen (Personen und Screenshots) liegen in Event-Unterordnern statt flach wie Garching/IAA — Erkennung war nicht rekursiv, betraf die Hälfte aller Events.
+  - Sammel-Funktionen (`loadExistingPersons`, `loadUnlinkedScreenshots`, `readAllNotesRecursive`) jetzt defensiv: eine kaputte Notiz überspringt sich selbst statt alles abzubrechen.
+  - Screenshot-Nummerierung kollidierte zwischen Events desselben Projekts (Präfix+Kürzel sind projektweit, nicht pro Event) — Nummerierung scannt jetzt alle Events eines Projekts; die dadurch schon entstandene Dateikollision (Garching 1/2, `G-P-001`–`003`) repariert.
+  - CSV-Export normalisiert Screenshot-Wikilinks jetzt einheitlich auf den bloßen Namen (alte Vault-Daten hatten teils den vollen Pfad im Link).
+  - "Zusätzliche Anmerkungen" war hart einprogrammiert und konnte Nutzereingaben überschreiben — ist jetzt ein normales Template-Feld.
+- "Datenbanken verwalten"-Button (bisher ohne Funktion) implementiert: Liste aller registrierten Vaults mit "Entfernen" (nur aus der Liste, keine Datei-Löschung).
+
+**Entscheidungen:** Nummerierungs-Fix im Code gelöst statt die RAW-Ordnerstruktur auf "ein Ordner pro Projekt" umzustellen — kleinerer Eingriff, gleiche Wirkung. Detaillierte Code-Erklärung aller Fixes in `docs/Review-2026-09-29.md` festgehalten statt hier im DEVLOG, da sehr umfangreich.
+
+**Probleme / Sackgassen:** Die Ursachenanalyse für "Screenshots nicht wählbar" und "Umschalten geht nicht" führte zunächst in zwei getrennte Richtungen, bis sich herausstellte, dass beide auf denselben zugrunde liegenden YAML-Escaping-Bug zurückgingen — ein Fund, der die Fehlersuche am Ende deutlich verkürzt hat.
+
+**Aufwand:** ~4h.
+
+**Offen:** Alles nur syntaktisch geprüft, noch nicht in der laufenden App getestet. Grundsatzfrage RAW-Ordner-pro-Projekt vs. pro-Event weiterhin offen. Tagging, Poster/Post-its, restliche Dashboard-Seiten weiterhin nicht angebunden.
+
 ## 2026-09-28 — Templates verwalten: generisches Template-System
 
 **Ziel:** Statt eines fest verdrahteten Personen-Templates ein generisches System, mit dem beliebige Template-Kategorien (Personen, Screenshots, künftig weitere) über die App selbst angelegt und bearbeitet werden können — inklusive automatischer Feld-Befüllung ohne hartcodierte Feldnamen im Code.

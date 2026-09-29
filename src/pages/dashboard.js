@@ -22,6 +22,11 @@ const toggle = document.querySelector("#vault-switcher-toggle");
 const menu = document.querySelector("#vault-switcher-menu");
 const vaultList = document.querySelector('#vault-list');
 const vaultAddButton = document.querySelector('#vault-add-button');
+const vaultManageButton = document.querySelector('#vault-manage-button');
+const vaultManageBackButton = document.querySelector('#vault-manage-back-button');
+const switchView = document.querySelector('#vault-switch-view');
+const manageView = document.querySelector('#vault-manage-view');
+const manageList = document.querySelector('#vault-manage-list');
 
 const otherVaults = vaults.filter((vault) => vault !== activeVault);
 
@@ -45,9 +50,11 @@ for (const vault of otherVaults) {
 toggle.addEventListener("click", () => {
     menu.classList.toggle("is-open");
     toggle.setAttribute("aria-expanded", menu.classList.contains("is-open"));
+    switchView.classList.remove("is-hidden");
+    manageView.classList.add("is-hidden");
 });
 
-vaultAddButton.addEventListener("click", async () => { 
+vaultAddButton.addEventListener("click", async () => {
     const folder = await open({ directory: true });
     if (folder) {
         if (!vaults.includes(folder)) {
@@ -59,4 +66,53 @@ vaultAddButton.addEventListener("click", async () => {
         await invoke("expand_scope", { folderPath: folder });
         window.location.reload();
     }
+});
+
+async function renderManageList() {
+    manageList.innerHTML = "";
+    for (const vault of vaults) {
+        const isActive = vault === activeVault;
+        const item = document.createElement("div");
+        item.className = "vault-manage-item";
+
+        const name = document.createElement("span");
+        name.className = "vault-manage-item-name";
+        name.textContent = await basename(vault);
+        name.title = vault;
+        item.appendChild(name);
+
+        if (isActive) {
+            const activeLabel = document.createElement("span");
+            activeLabel.className = "vault-manage-item-active";
+            activeLabel.textContent = "(aktiv)";
+            item.appendChild(activeLabel);
+        } else {
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "btn btn-primary";
+            removeButton.textContent = "Entfernen";
+            removeButton.addEventListener("click", async () => {
+                const updatedVaults = vaults.filter((v) => v !== vault);
+                vaults.length = 0;
+                vaults.push(...updatedVaults);
+                await store.set("vaults", vaults);
+                await store.save();
+                await renderManageList();
+            });
+            item.appendChild(removeButton);
+        }
+
+        manageList.appendChild(item);
+    }
+}
+
+vaultManageButton.addEventListener("click", async () => {
+    switchView.classList.add("is-hidden");
+    manageView.classList.remove("is-hidden");
+    await renderManageList();
+});
+
+vaultManageBackButton.addEventListener("click", () => {
+    manageView.classList.add("is-hidden");
+    switchView.classList.remove("is-hidden");
 });

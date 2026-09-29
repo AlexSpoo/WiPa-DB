@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { join } from "@tauri-apps/api/path";
+import { join, basename } from "@tauri-apps/api/path";
 import { readDir, readTextFile, writeTextFile, mkdir, exists, remove } from "@tauri-apps/plugin-fs";
 import { load as loadYaml } from "js-yaml";
 import { load as loadStore } from "@tauri-apps/plugin-store";
@@ -76,6 +76,18 @@ function extractWikilinkTarget(value) {
 async function readFrontmatter(filePath) {
     const raw = await readTextFile(filePath);
     return loadYaml(raw.split("---")[1]);
+}
+
+// Für Sammel-Durchläufe über viele Notizen: eine einzelne kaputte Datei (z. B.
+// ungültiges YAML) soll nicht die ganze Liste/Suche abbrechen, sondern nur
+// diese eine Notiz überspringen.
+async function safeReadFrontmatter(filePath) {
+    try {
+        return await readFrontmatter(filePath);
+    } catch (err) {
+        console.warn(`Konnte Frontmatter nicht lesen, überspringe: ${filePath}`, err);
+        return null;
+    }
 }
 
 async function loadNamingRules(typeKey) {
@@ -208,19 +220,37 @@ async function resolveEventFolder(baseDir, eventName) {
     return plainPath;
 }
 
+// Manche Standort-Ordner haben die Notizen direkt drin (Garching, IAA), andere
+// nochmal in Event-Unterordnern (MOSAIQ: Moosach/Schwabing) — deshalb rekursiv
+// suchen, statt nur eine Ordnerebene tief zu lesen.
+async function collectMdFilesRecursive(dir) {
+    const files = [];
+    if (!(await exists(dir))) return files;
+
+    for (const entry of await readDir(dir)) {
+        const entryPath = await join(dir, entry.name);
+        if (entry.isDirectory) {
+            files.push(...(await collectMdFilesRecursive(entryPath)));
+        } else if (entry.isFile && entry.name.endsWith(".md")) {
+            files.push(entryPath);
+        }
+    }
+    return files;
+}
+
 // Schon vorhandene Personen-Notizen eines Personenordners einlesen, um
 // bereits transkribierte Protokoll-Bilder herauszufiltern und die nächste
 // freie Personennummer zu bestimmen.
 async function loadExistingPersons(personenordner) {
     const dir = await join(personenDir, personenordner);
     const persons = [];
-    if (!(await exists(dir))) return persons;
 
-    for (const entry of await readDir(dir)) {
-        if (!entry.isFile || !entry.name.endsWith(".md")) continue;
-        const data = await readFrontmatter(await join(dir, entry.name));
+    for (const filePath of await collectMdFilesRecursive(dir)) {
+        const data = await safeReadFrontmatter(filePath);
+        if (!data) continue;
+        const fileName = (await basename(filePath)).replace(/\.md$/, "");
         persons.push({
-            fileName: entry.name.replace(/\.md$/, ""),
+            fileName,
             protokollBild: extractWikilinkTarget(data?.ProtokollBild),
             datum: data?.["Datum und Uhrzeit"] instanceof Date
                 ? formatDate(data["Datum und Uhrzeit"])
@@ -278,8 +308,19 @@ async function buildPersonenBatches() {
     return batches;
 }
 
+async function collectExistingScreenshotIds(personenordner) {
+    const dir = await join(screenshotsDir, personenordner);
+    const ids = new Set();
+    for (const filePath of await collectMdFilesRecursive(dir)) {
+        const fileName = (await basename(filePath)).replace(/\.md$/, "");
+        if (fileName.startsWith("Screenshot_")) ids.add(fileName.slice("Screenshot_".length));
+    }
+    return ids;
+}
+
 async function buildScreenshotBatches() {
     const batches = [];
+    const existingIdsByOrdner = new Map();
 
     for (const eventName of Object.keys(eventInfo)) {
         const info = eventInfo[eventName];
@@ -294,12 +335,11 @@ async function buildScreenshotBatches() {
             .sort();
         if (images.length === 0) continue;
 
-        const openImages = [];
-        for (const imageName of images) {
-            const id = imageName.replace(/\.[^.]+$/, "");
-            const notePath = await join(screenshotsDir, info.personenordner, `Screenshot_${id}.md`);
-            if (!(await exists(notePath))) openImages.push(imageName);
+        if (!existingIdsByOrdner.has(info.personenordner)) {
+            existingIdsByOrdner.set(info.personenordner, await collectExistingScreenshotIds(info.personenordner));
         }
+        const existingIds = existingIdsByOrdner.get(info.personenordner);
+        const openImages = images.filter((imageName) => !existingIds.has(imageName.replace(/\.[^.]+$/, "")));
         if (openImages.length === 0) continue;
 
         batches.push({ bereich: "Screenshots", eventName, eventFolder, openImages, info, hasTemplate: true });
@@ -485,13 +525,12 @@ async function loadImage(index) {
 async function loadUnlinkedScreenshots(personenordner) {
     const dir = await join(screenshotsDir, personenordner);
     const screenshots = [];
-    if (!(await exists(dir))) return screenshots;
 
-    for (const entry of await readDir(dir)) {
-        if (!entry.isFile || !entry.name.endsWith(".md")) continue;
-        const data = await readFrontmatter(await join(dir, entry.name));
-        if (data?.Person) continue;
-        screenshots.push({ fileName: entry.name.replace(/\.md$/, ""), id: data?.ID ?? entry.name });
+    for (const filePath of await collectMdFilesRecursive(dir)) {
+        const data = await safeReadFrontmatter(filePath);
+        if (!data || data.Person) continue;
+        const fileName = (await basename(filePath)).replace(/\.md$/, "");
+        screenshots.push({ fileName, id: data?.ID ?? fileName });
     }
     return screenshots.sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -776,7 +815,14 @@ async function renderForm() {
 
 function yamlScalar(value) {
     if (value === "" || value === null || value === undefined) return "";
-    const needsQuotes = /^[[{>|*&!%#`"'@,?-]/.test(value) || value.includes(": ") || value !== value.trim();
+    // Mehrzeilige Werte (aus den auto-wachsenden Textfeldern) MÜSSEN maskiert werden —
+    // ein rohes Zeilenumbruch-Zeichen in einem unquotierten Skalar ergibt ungültiges
+    // YAML und macht die ganze Datei unlesbar.
+    const needsQuotes = /^[[{>|*&!%#`"'@,?-]/.test(value)
+        || value.includes(": ")
+        || value.includes("\n")
+        || value.includes("\r")
+        || value !== value.trim();
     return needsQuotes ? JSON.stringify(value) : value;
 }
 
@@ -933,7 +979,10 @@ async function saveScreenshotNote() {
         }
     }
 
-    lines.push("Zusätzliche Anmerkungen:");
+    // "Zusätzliche Anmerkungen" ist bewusst kein hartcodiertes Feld mehr — jedes
+    // Screenshot-Template muss es wie jedes andere Feld selbst in seinem
+    // Feld-Katalog führen (siehe z. B. "Maps Garching"), sonst gäbe es hier einen
+    // doppelten YAML-Key und die Eingabe des Nutzers würde überschrieben.
     lines.push("Person:");
     lines.push("PositionZeitstrahl:");
     lines.push("Wahrscheinlichkeit:");

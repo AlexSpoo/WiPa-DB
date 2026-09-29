@@ -21,9 +21,15 @@
     <div class="vault-switcher">
       <button type="button" id="vault-switcher-toggle" class="btn btn-primary" aria-expanded="false">📁 <span id="vault-switcher-current"></span></button>
       <div class="vault-switcher-menu" id="vault-switcher-menu">
-          <div id="vault-list"></div>
-          <button type="button" id="vault-add-button" class="btn btn-primary">+ Neue Datenbank</button>
-          <button type="button" id="vault-manage-button" class="btn btn-primary">Datenbanken verwalten</button>
+          <div id="vault-switch-view">
+              <div id="vault-list"></div>
+              <button type="button" id="vault-add-button" class="btn btn-primary">+ Neue Datenbank</button>
+              <button type="button" id="vault-manage-button" class="btn btn-primary">Datenbanken verwalten</button>
+          </div>
+          <div id="vault-manage-view" class="is-hidden">
+              <div id="vault-manage-list"></div>
+              <button type="button" id="vault-manage-back-button" class="btn btn-primary">← Zurück</button>
+          </div>
       </div>
   </div>
   </main>

@@ -245,6 +245,41 @@ select option {
     display: flex;
 }
 
+#vault-switch-view,
+#vault-manage-view {
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+}
+
+#vault-list,
+#vault-manage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+}
+
+.vault-manage-item {
+    display: flex;
+    align-items: center;
+    gap: 1vh;
+    background-color: color-mix(in srgb, var(--color-text) 10%, transparent);
+    border-radius: 16px;
+    padding: 10px 16px;
+    white-space: nowrap;
+}
+
+.vault-manage-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vault-manage-item-active {
+    color: var(--color-line);
+    font-size: 0.85rem;
+}
+
 .rename {
   align-items: center;
   padding: 4vh;
@@ -1037,4 +1072,59 @@ select option {
   display: flex;
   align-items: center;
   gap: .8vh;
+}
+
+/* Daten auswerten */
+
+.evaluate {
+  padding: 4vh;
+  gap: 2vh;
+}
+
+.evaluate-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 2vh;
+}
+
+.evaluate-count {
+  color: var(--color-line);
+  margin-right: auto;
+}
+
+.evaluate-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 2px solid var(--color-line);
+  border-radius: 2vh;
+}
+
+.evaluate-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+}
+
+.evaluate-table th,
+.evaluate-table td {
+  padding: 1vh 1.5vh;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 40%, transparent);
+  text-align: left;
+  white-space: nowrap;
+  max-width: 40vh;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.evaluate-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--color-bg);
+  color: var(--color-line);
+  border-bottom: 2px solid var(--color-line);
+}
+
+.evaluate-table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--color-text) 6%, transparent);
 }
