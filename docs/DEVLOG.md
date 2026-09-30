@@ -1,5 +1,23 @@
 # DEVLOG
 
+## 2026-09-30 — Bugfixes aus dem zweiten Testdurchlauf
+
+**Ziel:** Drei Probleme beheben, die beim erneuten Testen nach den gestrigen Fixes aufgetaucht sind: Überschreiben bestehender Screenshot-Interpretationen beim Verknüpfen, fehlendes Einordnungs-Feld im Screenshot-Template, und veraltete Anzeige nach Entfernen einer Datenbank.
+
+**Umsetzung:**
+- `transcribe.js`: `saveScreenshotNote()` schreibt hartkodierte Leerzeilen für PositionZeitstrahl/Wahrscheinlichkeit/Einordnung/InterpretationenDesScreenshots nur noch, wenn das aktive Template das Feld nicht selbst definiert (gleiches Muster wie der "Zusätzliche Anmerkungen"-Fix von gestern).
+- `transcribe.js`: Beim Verknüpfen eines bestehenden Screenshots aus dem Personen-Formular ("+ Screenshot hinzufügen") werden die aktuellen Werte der Zieldatei jetzt vorgeladen und das Formular damit vorbefüllt, statt leer zu starten.
+- `dashboard.js`: `renderSwitchList()` als eigene Funktion extrahiert und nach jedem Entfernen einer Datenbank in "Datenbanken verwalten" erneut aufgerufen, damit der normale Vault-Switcher aktuell bleibt.
+- Vault: Feld "Einordnung" (wünschenswert/nicht wünschenswert/ambivalent/nicht protokolliert) zu allen 14 Screenshot-Templates hinzugefügt — erst möglich, weil der Duplicate-Key-Fix jetzt verhindert, dass das Feld beim Speichern überschrieben wird.
+
+**Entscheidungen:** Duplicate-Key-Fix wurde bewusst auf alle vier betroffenen Felder generalisiert statt nur für Einordnung, da derselbe Bug dieselbe Ursache hat. Vorbefüllung nach dem vom Nutzer selbst vorgeschlagenen Prinzip umgesetzt: bestehenden Wert aus der Zieldatei laden, Formular damit befüllen, Nutzer kann ändern/ergänzen.
+
+**Probleme / Sackgassen:** Keine.
+
+**Aufwand:** ~2h
+
+**Offen:** "Wahrscheinlichkeit" könnte durch denselben Fix ebenfalls in die Screenshot-Templates aufgenommen werden — noch nicht gemacht, da nicht ausdrücklich gewünscht.
+
 ## 2026-09-29 — Daten auswerten, erster Testdurchlauf, Bugfixes aus dem Testfeedback
 
 **Ziel:** Erste vollständige, abgabefähige Version fertigstellen — Datenbank-Listenansicht mit CSV-Export ergänzen, dann per komplettem Testdurchlauf verifizieren und die dabei gefundenen Probleme beheben.

@@ -28,24 +28,30 @@ const switchView = document.querySelector('#vault-switch-view');
 const manageView = document.querySelector('#vault-manage-view');
 const manageList = document.querySelector('#vault-manage-list');
 
-const otherVaults = vaults.filter((vault) => vault !== activeVault);
-
 document.querySelector("#vault-switcher-current").textContent = await basename(activeVault);
 
-for (const vault of otherVaults) {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "btn btn-primary vault-list-item";
-    item.textContent = await basename(vault);
-    item.addEventListener("click", async () => {
-        await store.set("activeVault", vault);
-        await store.save();
-        await invoke("expand_scope", { folderPath: vault });
-        window.location.reload();
-    });
-    vaultList.appendChild(item);
+// In eine Funktion ausgelagert, damit die Liste auch nach dem Entfernen einer
+// Datenbank über "Datenbanken verwalten" aktualisiert werden kann, statt nur
+// einmal beim Laden der Seite gefüllt zu werden.
+async function renderSwitchList() {
+    vaultList.innerHTML = "";
+    const otherVaults = vaults.filter((vault) => vault !== activeVault);
+    for (const vault of otherVaults) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "btn btn-primary vault-list-item";
+        item.textContent = await basename(vault);
+        item.addEventListener("click", async () => {
+            await store.set("activeVault", vault);
+            await store.save();
+            await invoke("expand_scope", { folderPath: vault });
+            window.location.reload();
+        });
+        vaultList.appendChild(item);
+    }
 }
 
+await renderSwitchList();
 
 toggle.addEventListener("click", () => {
     menu.classList.toggle("is-open");
@@ -98,6 +104,7 @@ async function renderManageList() {
                 await store.set("vaults", vaults);
                 await store.save();
                 await renderManageList();
+                await renderSwitchList();
             });
             item.appendChild(removeButton);
         }

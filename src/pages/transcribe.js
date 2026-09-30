@@ -530,7 +530,7 @@ async function loadUnlinkedScreenshots(personenordner) {
         const data = await safeReadFrontmatter(filePath);
         if (!data || data.Person) continue;
         const fileName = (await basename(filePath)).replace(/\.md$/, "");
-        screenshots.push({ fileName, id: data?.ID ?? fileName });
+        screenshots.push({ fileName, id: data?.ID ?? fileName, data });
     }
     return screenshots.sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -716,6 +716,8 @@ function renderScreenshotField(field, container) {
     addButton.className = "link-secondary";
     addButton.textContent = "+ Screenshot hinzufügen";
 
+    let availableByFileName = new Map();
+
     loadUnlinkedScreenshots(currentBatch.info.personenordner).then((screenshots) => {
         const alreadyAdded = new Set(currentValues()[field.name].map((entry) => entry.fileName));
         const available = screenshots.filter((s) => !alreadyAdded.has(s.fileName));
@@ -727,6 +729,7 @@ function renderScreenshotField(field, container) {
             return;
         }
         for (const screenshot of available) {
+            availableByFileName.set(screenshot.fileName, screenshot);
             const option = document.createElement("option");
             option.value = screenshot.fileName;
             option.textContent = screenshot.id;
@@ -734,11 +737,20 @@ function renderScreenshotField(field, container) {
         }
     });
 
+    // Falls dieser Screenshot schon einmal (z. B. von einer anderen Person)
+    // verknüpft war und dabei Werte bekommen hat, werden die hier übernommen,
+    // statt sie beim Speichern mit leeren Unterfeldern zu überschreiben.
     addButton.addEventListener("click", () => {
         if (!select.value) return;
+        const existingData = availableByFileName.get(select.value)?.data;
         const entry = { fileName: select.value };
         for (const sub of field.unterfelder) {
-            entry[sub.name] = sub.typ === "freitext-liste" ? [] : "";
+            const existingValue = existingData?.[sub.name];
+            if (sub.typ === "freitext-liste") {
+                entry[sub.name] = Array.isArray(existingValue) ? existingValue : [];
+            } else {
+                entry[sub.name] = typeof existingValue === "string" ? existingValue : "";
+            }
         }
         currentValues()[field.name].push(entry);
         renderEntries();
@@ -979,15 +991,17 @@ async function saveScreenshotNote() {
         }
     }
 
-    // "Zusätzliche Anmerkungen" ist bewusst kein hartcodiertes Feld mehr — jedes
-    // Screenshot-Template muss es wie jedes andere Feld selbst in seinem
-    // Feld-Katalog führen (siehe z. B. "Maps Garching"), sonst gäbe es hier einen
-    // doppelten YAML-Key und die Eingabe des Nutzers würde überschrieben.
+    // "Zusätzliche Anmerkungen", "Wahrscheinlichkeit", "Einordnung" & Co. sind
+    // bewusst keine hartcodierten Felder — ein Screenshot-Template kann sie wie
+    // jedes andere Feld selbst in seinem Feld-Katalog führen (siehe z. B. "Maps
+    // Garching" für Zusätzliche Anmerkungen). Nur wenn das Template ein solches
+    // Feld NICHT selbst definiert, wird hier ein leerer Platzhalter ergänzt —
+    // sonst gäbe es einen doppelten YAML-Key und die Eingabe ginge verloren.
+    const templateFieldNames = new Set(templateFields.map((field) => field.name));
     lines.push("Person:");
-    lines.push("PositionZeitstrahl:");
-    lines.push("Wahrscheinlichkeit:");
-    lines.push("Einordnung:");
-    lines.push("InterpretationenDesScreenshots:");
+    for (const key of ["PositionZeitstrahl", "Wahrscheinlichkeit", "Einordnung", "InterpretationenDesScreenshots"]) {
+        if (!templateFieldNames.has(key)) lines.push(`${key}:`);
+    }
     lines.push("---");
     lines.push("");
     lines.push(`![[${imageFileName}|500]]`);
