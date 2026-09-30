@@ -5,13 +5,13 @@ class AppHeader extends HTMLElement {
                 <a href="/pages/dashboard.html">←</a>
                 <button type="button" aria-label="Menü öffnen" aria-expanded="false">☰</button>
                 <nav class="menu-nav">
-                    <a id="nav-dashboard" href="dashboard.html" class="nav-tile btn btn-primary">Dashboard</a>
-                    <a id="nav-upload" href="upload.html" class="nav-tile btn btn-primary">Bilder Hochladen</a>
-                    <a id="nav-transcribe" href="transcribe.html" class="nav-tile btn btn-primary">Bilder digitalisieren</a>
-                    <a id="nav-templates" href="templates.html" class="nav-tile btn btn-primary">Templates verwalten</a>
-                    <a id="nav-tag" href="tag.html" class="nav-tile btn btn-primary">Daten vertaggen</a>
-                    <a id="nav-evaluate" href="evaluate.html" class="nav-tile btn btn-primary">Daten auswerten</a>
-                    <a id="nav-export" href="export.html" class="nav-tile btn btn-primary">Vault/Datenbank exportieren</a>
+                    <a id="nav-dashboard" href="dashboard.html" class="nav-tile btn btn-primary btn-shadow-inset">Dashboard</a>
+                    <a id="nav-upload" href="upload.html" class="nav-tile btn btn-primary btn-shadow-inset">Bilder Hochladen</a>
+                    <a id="nav-transcribe" href="transcribe.html" class="nav-tile btn btn-primary btn-shadow-inset">Bilder digitalisieren</a>
+                    <a id="nav-templates" href="templates.html" class="nav-tile btn btn-primary btn-shadow-inset">Templates verwalten</a>
+                    <a id="nav-tag" href="tag.html" class="nav-tile btn btn-primary btn-shadow-inset">Daten vertaggen</a>
+                    <a id="nav-evaluate" href="evaluate.html" class="nav-tile btn btn-primary btn-shadow-inset">Daten auswerten</a>
+                    <a id="nav-export" href="export.html" class="nav-tile btn btn-primary btn-shadow-inset">Vault/Datenbank exportieren</a>
                 </nav>
             </header>
         `; 

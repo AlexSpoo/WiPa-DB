@@ -21,6 +21,7 @@ if (dashboardMessage) {
 const toggle = document.querySelector("#vault-switcher-toggle");
 const menu = document.querySelector("#vault-switcher-menu");
 const vaultList = document.querySelector('#vault-list');
+const vaultListDivider = document.querySelector('#vault-list-divider');
 const vaultAddButton = document.querySelector('#vault-add-button');
 const vaultManageButton = document.querySelector('#vault-manage-button');
 const vaultManageBackButton = document.querySelector('#vault-manage-back-button');
@@ -49,6 +50,7 @@ async function renderSwitchList() {
         });
         vaultList.appendChild(item);
     }
+    vaultListDivider.classList.toggle("is-hidden", otherVaults.length === 0);
 }
 
 await renderSwitchList();

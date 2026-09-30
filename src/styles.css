@@ -56,7 +56,33 @@ body {
 
 header {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2vh 4vh;
+  gap: 2vh;
+}
 
+header > a,
+header > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4em;
+  height: 2.4em;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--color-line);
+  background-color: color-mix(in srgb, var(--color-text) 10%, transparent);
+  font-size: 1.2rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .2s ease;
+}
+
+header > a:hover,
+header > button:hover {
+  transform: scale(1.05);
 }
 
 main {
@@ -64,6 +90,7 @@ main {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  padding: 4vh;
 }
 
 button {
@@ -98,7 +125,18 @@ select option {
 /* Layout */
 .menu-nav {
   position: absolute;
+  top: 100%;
+  right: 4vh;
+  margin-top: 1vh;
   flex-direction: column;
+  gap: 1vh;
+  padding: 2vh;
+  min-width: 26vh;
+  background-color: var(--color-bg);
+  border: 2px solid var(--color-line);
+  border-radius: 2vh;
+  box-shadow: 0 10px 30px color-mix(in srgb, black 40%, transparent);
+  z-index: 10;
   display: none;
 }
 
@@ -259,6 +297,12 @@ select option {
     gap: 1vh;
 }
 
+.vault-switcher-divider {
+    height: 2px;
+    background-color: var(--color-line);
+    opacity: .4;
+}
+
 .vault-manage-item {
     display: flex;
     align-items: center;
@@ -282,7 +326,6 @@ select option {
 
 .rename {
   align-items: center;
-  padding: 4vh;
   gap: 3vh;
 }
 
@@ -380,6 +423,13 @@ select option {
   align-items: center;
   justify-content: center;
   gap: 2vh;
+  width: 100%;
+  max-width: 90vh;
+}
+
+.rename-image-row.is-split {
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .rename-image-box {
@@ -398,10 +448,13 @@ select option {
 
 .rename-image-row.is-split .rename-image-box--preview {
   display: flex;
+  flex: 1;
+  min-width: 0;
 }
 
 .rename-image-row.is-split .rename-image-box:not(.rename-image-box--preview) {
   border-color: var(--color-accent);
+  flex-shrink: 0;
 }
 
 .rename-image {
@@ -555,6 +608,7 @@ select option {
   border-radius: 16px;
   border: 0;
   font-size: 1rem;
+  text-decoration: none;
   cursor: pointer;
   transition: transform .2s ease, box-shadow .2s ease;
 }
@@ -596,9 +650,15 @@ select option {
 
 /* Links */
 .link-secondary {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
   color: var(--color-accent);
   text-decoration: underline;
   font-size: 0.9rem;
+  cursor: pointer;
 }
 
 
@@ -613,7 +673,6 @@ select option {
 /* Transkribieren */
 
 .transcribe {
-  padding: 4vh;
   gap: 3vh;
 }
 
@@ -847,7 +906,6 @@ select option {
 /* Templates verwalten */
 
 .templates {
-  padding: 4vh;
   gap: 3vh;
 }
 
@@ -1077,7 +1135,6 @@ select option {
 /* Daten auswerten */
 
 .evaluate {
-  padding: 4vh;
   gap: 2vh;
 }
 
