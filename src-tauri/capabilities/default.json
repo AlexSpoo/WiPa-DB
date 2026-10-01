@@ -11,6 +11,7 @@
     "store:default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
+    "fs:allow-write-file",
     "fs:allow-read-dir",
     "fs:allow-copy-file",
     "fs:allow-mkdir",

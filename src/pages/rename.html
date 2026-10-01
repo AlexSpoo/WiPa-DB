@@ -43,6 +43,7 @@
                 <select id="rename-type-select">
                     <option value="protokoll">Protokoll</option>
                     <option value="screenshot">Screenshot</option>
+                    <option value="szenariobild">Szenariobild</option>
                 </select>
             </div>
             <div class="rename-field">
@@ -57,7 +58,11 @@
                     <option value="" selected disabled>Typ wählen</option>
                 </select>
             </div>
-            <div class="rename-field rename-field--number">
+            <div class="rename-field is-hidden" id="rename-szenariobild-name-field">
+                <label for="rename-szenariobild-name-input">Name</label>
+                <input type="text" id="rename-szenariobild-name-input" placeholder="z. B. Mobilität">
+            </div>
+            <div class="rename-field rename-field--number" id="rename-number-field">
                 <label for="rename-number-input">Nr.</label>
                 <input type="text" id="rename-number-input">
             </div>

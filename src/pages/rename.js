@@ -9,6 +9,7 @@ const fileStates = filesToRename.map(() => ({
     type: "protokoll",
     event: "",
     screenshotType: "",
+    szenariobildName: "",
     number: "",
     name: "",
     manualOverride: false,
@@ -29,6 +30,9 @@ const typeSelect = document.querySelector("#rename-type-select");
 const eventSelect = document.querySelector("#rename-event-select");
 const screenshotTypeField = document.querySelector("#rename-screenshot-type-field");
 const screenshotTypeSelect = document.querySelector("#rename-screenshot-type-select");
+const szenariobildNameField = document.querySelector("#rename-szenariobild-name-field");
+const szenariobildNameInput = document.querySelector("#rename-szenariobild-name-input");
+const numberField = document.querySelector("#rename-number-field");
 const numberInput = document.querySelector("#rename-number-input");
 const editNameButton = document.querySelector("#rename-edit-name-button");
 const nextButton = document.querySelector("#rename-next-button");
@@ -48,6 +52,7 @@ const activeVault = await store.get("activeVault");
 await invoke("expand_scope", { folderPath: activeVault });
 const protokollDir = await join(activeVault, "Media", "Images", "Protokolle(RAW)");
 const screenshotDir = await join(activeVault, "Media", "Images", "Screenshots(RAW)");
+const szenariobildDir = await join(activeVault, "Media", "Images", "Szenariobilder(RAW)");
 
 function formatDate(value) {
     if (!(value instanceof Date)) return value;
@@ -57,6 +62,14 @@ function formatDate(value) {
     const month = String(value.getUTCMonth() + 1).padStart(2, "0");
     const day = String(value.getUTCDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+}
+
+const dateBasedTypes = new Set(["protokoll"]);
+
+function baseDirFor(type) {
+    if (type === "protokoll") return protokollDir;
+    if (type === "szenariobild") return szenariobildDir;
+    return screenshotDir;
 }
 
 function extractWikilinkTarget(value) {
@@ -154,8 +167,8 @@ function highestBatchNumber(predicate) {
     return highest;
 }
 
-async function computeNextProtokollNumber(eventName, date, rules) {
-    const eventPath = await resolveEventFolder(protokollDir, eventName);
+async function computeNextDateBasedNumber(type, eventName, date, rules) {
+    const eventPath = await resolveEventFolder(baseDirFor(type), eventName);
 
     let highestUnderMax = 0;
     let highestOverall = 0;
@@ -172,7 +185,7 @@ async function computeNextProtokollNumber(eventName, date, rules) {
         }
     }
 
-    const batchHighest = highestBatchNumber((state) => state.type === "protokoll" && state.event === eventName && state.date === date);
+    const batchHighest = highestBatchNumber((state) => state.type === type && state.event === eventName && state.date === date);
     if (batchHighest > highestOverall) highestOverall = batchHighest;
     if (batchHighest <= rules.counterMax && batchHighest > highestUnderMax) highestUnderMax = batchHighest;
 
@@ -221,15 +234,21 @@ async function loadNamingRules(typeKey) {
 function updateNameFromFields() {
     const state = fileStates[currentIndex];
     if (state.manualOverride) return;
-    if (!state.rules) return;
 
-    if (state.type === "protokoll") {
-        if (!state.date) return;
+    if (dateBasedTypes.has(state.type)) {
+        if (!state.rules || !state.date) return;
         newNameInput.value = `${state.rules.prefix}_${state.date}_${numberInput.value}`;
     } else if (state.type === "screenshot") {
+        if (!state.rules || !state.screenshotType) return;
         const prefix = eventInfo[state.event]?.screenshotPrefix ?? "";
-        if (!state.screenshotType) return;
         newNameInput.value = `${prefix}${screenshotTypeInfo[state.screenshotType]}-${numberInput.value}`;
+    } else if (state.type === "szenariobild") {
+        if (!state.szenariobildName) {
+            newNameInput.value = "";
+            return;
+        }
+        const prefix = eventInfo[state.event]?.screenshotPrefix ?? "";
+        newNameInput.value = `Szenariobild_${prefix}${state.szenariobildName}`;
     }
 }
 
@@ -245,12 +264,12 @@ async function recomputeNumber() {
     state.manualOverride = false;
     newNameInput.readOnly = true;
 
-    if (type === "protokoll") {
+    if (dateBasedTypes.has(type)) {
         state.date = eventInfo[eventName]?.date;
         if (!state.date) return;
 
-        state.rules = await loadNamingRules("protokoll");
-        const number = await computeNextProtokollNumber(eventName, state.date, state.rules);
+        state.rules = await loadNamingRules(type);
+        const number = await computeNextDateBasedNumber(type, eventName, state.date, state.rules);
         if (eventSelect.value !== eventName || typeSelect.value !== type) return;
 
         numberInput.value = number;
@@ -265,6 +284,9 @@ async function recomputeNumber() {
         if (eventSelect.value !== eventName || typeSelect.value !== type || screenshotTypeSelect.value !== screenshotType) return;
 
         numberInput.value = number;
+    } else if (type === "szenariobild") {
+        // kein Zähler — der Name kommt frei vom Nutzer (z. B. "Mobilität")
+        state.szenariobildName = szenariobildNameInput.value;
     }
 
     updateNameFromFields();
@@ -273,9 +295,12 @@ async function recomputeNumber() {
 
 typeSelect.addEventListener("change", () => {
     fileStates[currentIndex].skipped = false;
-    const isScreenshot = typeSelect.value === "screenshot";
-    screenshotTypeField.classList.toggle("is-hidden", !isScreenshot);
+    const type = typeSelect.value;
+    screenshotTypeField.classList.toggle("is-hidden", type !== "screenshot");
+    szenariobildNameField.classList.toggle("is-hidden", type !== "szenariobild");
+    numberField.classList.toggle("is-hidden", type === "szenariobild");
     screenshotTypeSelect.value = "";
+    szenariobildNameInput.value = "";
     numberInput.value = "";
     newNameInput.value = "";
     if (eventSelect.value) recomputeNumber();
@@ -286,6 +311,7 @@ function saveCurrentState() {
     state.type = typeSelect.value;
     state.event = eventSelect.value;
     state.screenshotType = screenshotTypeSelect.value;
+    state.szenariobildName = szenariobildNameInput.value;
     state.number = numberInput.value;
     state.name = newNameInput.value;
 }
@@ -294,6 +320,7 @@ function resetStateFields(state) {
     state.type = "protokoll";
     state.event = "";
     state.screenshotType = "";
+    state.szenariobildName = "";
     state.number = "";
     state.name = "";
     state.date = null;
@@ -304,8 +331,16 @@ function resetStateFields(state) {
 function updateLastGoodState() {
     const state = fileStates[currentIndex];
     if (state.skipped) return;
+
+    // Szenariobild hat weder Zähler noch Regeln — nur das Event soll für das
+    // nächste Bild übernommen werden, der Name bleibt bewusst leer.
+    if (state.type === "szenariobild") {
+        if (state.event) lastGoodState = { ...state };
+        return;
+    }
+
     if (state.event && state.rules && state.number &&
-        (state.type === "protokoll" ? state.date : state.screenshotType)) {
+        (dateBasedTypes.has(state.type) ? state.date : state.screenshotType)) {
         lastGoodState = { ...state };
     }
 }
@@ -313,14 +348,17 @@ function updateLastGoodState() {
 async function refreshNextButtonState() {
     const type = typeSelect.value;
     const eventChosen = !!eventSelect.value;
-    const typeSpecificChosen = type === "screenshot" ? !!screenshotTypeSelect.value : true;
+    const typeSpecificChosen = type === "screenshot"
+        ? !!screenshotTypeSelect.value
+        : type === "szenariobild"
+            ? !!szenariobildNameInput.value
+            : true;
 
     let nameExists = false;
     if (eventChosen && typeSpecificChosen && newNameInput.value) {
         const originalName = await basename(filesToRename[currentIndex]);
         const extension = originalName.slice(originalName.lastIndexOf("."));
-        const baseDir = type === "protokoll" ? protokollDir : screenshotDir;
-        const eventDir = await resolveEventFolder(baseDir, eventSelect.value);
+        const eventDir = await resolveEventFolder(baseDirFor(type), eventSelect.value);
         const destinationPath = await join(eventDir, `${newNameInput.value}${extension}`);
         nameExists = await exists(destinationPath);
     }
@@ -351,9 +389,11 @@ async function loadFile(index) {
     updatePreviewImage();
 
     typeSelect.value = state.type;
-    const isScreenshot = state.type === "screenshot";
-    screenshotTypeField.classList.toggle("is-hidden", !isScreenshot);
+    screenshotTypeField.classList.toggle("is-hidden", state.type !== "screenshot");
     screenshotTypeSelect.value = state.screenshotType;
+    szenariobildNameField.classList.toggle("is-hidden", state.type !== "szenariobild");
+    szenariobildNameInput.value = state.szenariobildName;
+    numberField.classList.toggle("is-hidden", state.type === "szenariobild");
 
     eventSelect.value = state.event;
     numberInput.value = state.number;
@@ -410,13 +450,13 @@ async function showEditView(index) {
 }
 
 async function getNextNumber(previous) {
-    if (previous.type === "protokoll") {
+    if (dateBasedTypes.has(previous.type)) {
         const previousValue = parseInt(previous.number, 10);
         if (previousValue < previous.rules.counterMax) {
             return String(previousValue + 1).padStart(previous.rules.counterDigits, "0");
         }
         // Maximum erreicht/überschritten: statt weiter hochzuzählen, insgesamt höchste vorhandene Nummer + 1 suchen
-        return await computeNextProtokollNumber(previous.event, previous.date, previous.rules);
+        return await computeNextDateBasedNumber(previous.type, previous.event, previous.date, previous.rules);
     }
 
     // Screenshots haben kein Maximum, einfach weiterzählen
@@ -432,17 +472,24 @@ async function advanceTo(newIndex) {
     if (!nextState.event && lastGoodState) {
         nextState.type = lastGoodState.type;
         nextState.event = lastGoodState.event;
-        nextState.screenshotType = lastGoodState.screenshotType;
-        nextState.date = lastGoodState.date;
-        nextState.rules = lastGoodState.rules;
-        nextState.number = await getNextNumber(lastGoodState);
 
-        if (nextState.type === "protokoll") {
-            nextState.name = `${nextState.rules.prefix}_${nextState.date}_${nextState.number}`;
+        if (lastGoodState.type === "szenariobild") {
+            // Name bewusst NICHT übernehmen — jedes Szenariobild braucht einen eigenen Namen
+            nextState.szenariobildName = "";
+            nextState.name = "";
         } else {
-            const prefix = eventInfo[nextState.event]?.screenshotPrefix ?? "";
-            const typeKürzel = screenshotTypeInfo[nextState.screenshotType];
-            nextState.name = `${prefix}${typeKürzel}-${nextState.number}`;
+            nextState.screenshotType = lastGoodState.screenshotType;
+            nextState.date = lastGoodState.date;
+            nextState.rules = lastGoodState.rules;
+            nextState.number = await getNextNumber(lastGoodState);
+
+            if (dateBasedTypes.has(nextState.type)) {
+                nextState.name = `${nextState.rules.prefix}_${nextState.date}_${nextState.number}`;
+            } else {
+                const prefix = eventInfo[nextState.event]?.screenshotPrefix ?? "";
+                const typeKürzel = screenshotTypeInfo[nextState.screenshotType];
+                nextState.name = `${prefix}${typeKürzel}-${nextState.number}`;
+            }
         }
     }
 
@@ -455,6 +502,15 @@ screenshotTypeSelect.addEventListener("change", recomputeNumber);
 numberInput.addEventListener("input", async () => {
     fileStates[currentIndex].manualOverride = false;
     fileStates[currentIndex].skipped = false;
+    newNameInput.readOnly = true;
+    updateNameFromFields();
+    await refreshNextButtonState();
+});
+
+szenariobildNameInput.addEventListener("input", async () => {
+    fileStates[currentIndex].manualOverride = false;
+    fileStates[currentIndex].skipped = false;
+    fileStates[currentIndex].szenariobildName = szenariobildNameInput.value;
     newNameInput.readOnly = true;
     updateNameFromFields();
     await refreshNextButtonState();
@@ -479,8 +535,7 @@ async function saveAllFiles() {
         const originalName = await basename(originalPath);
         const extension = originalName.slice(originalName.lastIndexOf("."));
 
-        const baseDir = state.type === "protokoll" ? protokollDir : screenshotDir;
-        const eventDir = await resolveEventFolder(baseDir, state.event);
+        const eventDir = await resolveEventFolder(baseDirFor(state.type), state.event);
         await mkdir(eventDir, { recursive: true });
 
         const destinationPath = await join(eventDir, `${state.name}${extension}`);

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiPa DB - Zukunftskegel</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <app-header></app-header>
+    <main class="cone">
+        <div class="cone-topbar">
+            <div>
+                <h1>Zukunftskegel</h1>
+                <p id="cone-subtitle" class="cone-subtitle"></p>
+            </div>
+            <div class="cone-topbar-actions">
+                <button type="button" id="cone-export-svg-button" class="btn btn-primary btn-shadow-inset">SVG exportieren</button>
+                <button type="button" id="cone-export-png-button" class="link-secondary">PNG exportieren</button>
+            </div>
+        </div>
+
+        <div class="cone-body">
+            <aside class="cone-sidebar">
+                <div class="evaluate-view-toggle cone-sidebar-tabs" id="cone-sidebar-tabs">
+                    <button type="button" class="evaluate-view-tab is-active" id="cone-tab-settings-button">Einstellungen</button>
+                    <button type="button" class="evaluate-view-tab" id="cone-tab-data-button">Daten</button>
+                </div>
+                <div class="cone-sidebar-content" id="cone-sidebar-content"></div>
+            </aside>
+
+            <div class="cone-canvas-area" id="cone-canvas-area"></div>
+        </div>
+    </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="cone.js"></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiPa DB - Post-its</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <app-header></app-header>
+    <main class="postits">
+        <div class="postits-batches" id="postits-batches">
+            <h1>Post-its digitalisieren</h1>
+            <p id="postits-batches-empty" class="is-hidden">Keine Szenariobilder gefunden. Lade zuerst Fotos über "Hochladen" hoch und wähle dort "Szenariobild" als Art.</p>
+            <ul class="transcribe-batch-list" id="postits-batch-list"></ul>
+        </div>
+
+        <div class="postits-picker-view is-hidden" id="postits-picker-view">
+            <div class="transcribe-edit-header">
+                <span id="postits-picker-label" class="transcribe-event-label"></span>
+                <button type="button" id="postits-picker-back-button" class="link-secondary">← Zurück zur Übersicht</button>
+            </div>
+            <div class="transcribe-layout">
+                <div class="transcribe-form-column">
+                    <div class="templates-new-box postits-new-poster-box">
+                        <div class="transcribe-field">
+                            <label for="postits-new-poster-name">Neues Poster auf diesem Szenariobild</label>
+                            <input id="postits-new-poster-name" placeholder="z. B. Wohnen">
+                        </div>
+                        <button type="button" id="postits-new-poster-button" class="btn btn-primary btn-shadow-inset">+ Poster erstellen</button>
+                    </div>
+                    <ul class="transcribe-batch-list" id="postits-poster-list"></ul>
+                    <p id="postits-poster-list-empty" class="transcribe-static">Noch kein Poster auf diesem Szenariobild angelegt.</p>
+                </div>
+                <div class="transcribe-image-column">
+                    <div class="transcribe-image-box">
+                        <img id="postits-picker-image" class="transcribe-image" alt="">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="postits-workspace-view is-hidden" id="postits-workspace-view">
+            <div class="transcribe-edit-header">
+                <div>
+                    <span id="postits-workspace-event-label" class="transcribe-event-label"></span>
+                    <span id="postits-workspace-poster-name" class="transcribe-image-name"></span>
+                </div>
+                <button type="button" id="postits-workspace-back-button" class="link-secondary">← Zurück zur Poster-Auswahl</button>
+            </div>
+
+            <div class="postits-layout">
+                <div class="postits-sidebar">
+                    <div class="postits-sidebar-tabs">
+                        <button type="button" class="postits-tab is-active" data-tab="typen">Typen</button>
+                        <button type="button" class="postits-tab" data-tab="liste">Post-its</button>
+                    </div>
+
+                    <div class="postits-tab-panel" data-panel="typen">
+                        <ul class="postits-typen-list" id="postits-typen-list"></ul>
+                        <div class="postits-typen-add">
+                            <input id="postits-new-typ-name" placeholder="Neue Art…">
+                            <button type="button" id="postits-add-typ-button" class="btn btn-primary">+</button>
+                        </div>
+                    </div>
+
+                    <div class="postits-tab-panel is-hidden" data-panel="liste">
+                        <ul class="postits-item-list" id="postits-item-list"></ul>
+                        <p id="postits-item-list-empty" class="transcribe-static">Noch keine Post-its auf diesem Poster.</p>
+                    </div>
+                </div>
+
+                <div class="postits-canvas-column">
+                    <div class="postits-canvas" id="postits-canvas">
+                        <img id="postits-canvas-image" alt="">
+                        <svg id="postits-canvas-svg"></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="postits-modal-overlay is-hidden" id="postits-modal-overlay">
+            <div class="postits-modal">
+                <h2>Neues Post-it</h2>
+                <p id="postits-modal-position" class="transcribe-static"></p>
+                <div class="transcribe-field">
+                    <label for="postits-modal-number">Nummer</label>
+                    <input id="postits-modal-number">
+                </div>
+                <div class="transcribe-field">
+                    <label for="postits-modal-art">Art</label>
+                    <select id="postits-modal-art"></select>
+                </div>
+                <div class="transcribe-field">
+                    <label for="postits-modal-text">Textinhalt</label>
+                    <textarea id="postits-modal-text" rows="3"></textarea>
+                </div>
+                <div class="postits-modal-actions">
+                    <button type="button" id="postits-modal-cancel" class="btn btn-primary">Abbrechen</button>
+                    <button type="button" id="postits-modal-save" class="btn btn-primary btn-shadow-inset">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="postits.js"></script>
+</body>
+</html>

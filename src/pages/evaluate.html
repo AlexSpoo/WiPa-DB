@@ -20,11 +20,65 @@
                 </select>
             </div>
             <span id="evaluate-count" class="evaluate-count"></span>
+
+            <details class="evaluate-column-picker">
+                <summary>Spalten</summary>
+                <div class="evaluate-column-picker-list" id="evaluate-column-picker-list"></div>
+            </details>
+
+            <details class="evaluate-column-picker">
+                <summary>+ Verknüpftes Feld</summary>
+                <div class="evaluate-join-panel">
+                    <div class="evaluate-join-steps" id="evaluate-join-steps"></div>
+                    <button type="button" id="evaluate-join-add-button" class="btn btn-primary" disabled>Hinzufügen</button>
+                    <div class="evaluate-joined-columns-list" id="evaluate-joined-columns-list"></div>
+                </div>
+            </details>
+
+            <button type="button" id="evaluate-reset-filters-button" class="link-secondary">Filter zurücksetzen</button>
+
+            <div class="evaluate-view-toggle">
+                <button type="button" id="evaluate-view-table-button" class="evaluate-view-tab is-active">Tabelle</button>
+                <button type="button" id="evaluate-view-charts-button" class="evaluate-view-tab">Graphen</button>
+            </div>
+
             <button type="button" id="evaluate-export-button" class="btn btn-primary btn-shadow-inset">Als CSV exportieren</button>
         </div>
 
-        <div class="evaluate-table-wrapper">
+        <div class="evaluate-table-wrapper" id="evaluate-table-view">
             <table id="evaluate-table" class="evaluate-table"></table>
+        </div>
+
+        <div class="evaluate-charts-view is-hidden" id="evaluate-charts-view">
+            <div class="evaluate-chart-controls">
+                <div class="transcribe-field">
+                    <label for="evaluate-facet-field">Ein Graph pro Ausprägung von</label>
+                    <select id="evaluate-facet-field"></select>
+                </div>
+                <div class="transcribe-field">
+                    <label for="evaluate-x-field">X-Achse jedes Graphen</label>
+                    <select id="evaluate-x-field">
+                        <option value="">— keine (nur Übersicht) —</option>
+                    </select>
+                </div>
+                <div class="transcribe-field">
+                    <label for="evaluate-chart-type">Diagrammtyp</label>
+                    <select id="evaluate-chart-type">
+                        <option value="bar">Balken</option>
+                        <option value="line">Linie</option>
+                    </select>
+                </div>
+                <label class="evaluate-chart-checkbox">
+                    <input type="checkbox" id="evaluate-chart-percent">
+                    Prozent statt Anzahl
+                </label>
+                <label class="evaluate-chart-checkbox">
+                    <input type="checkbox" id="evaluate-chart-hide-empty">
+                    "nicht eingetragen" ausblenden
+                </label>
+                <button type="button" id="evaluate-chart-export-csv-button" class="link-secondary">Als CSV exportieren</button>
+            </div>
+            <div class="evaluate-chart-grid" id="evaluate-chart-grid"></div>
         </div>
     </main>
     <script type="module" src="/shared/app-header.js"></script>

@@ -2,15 +2,19 @@ class AppHeader extends HTMLElement {
     connectedCallback() { 
         this.innerHTML = `
             <header>
-                <a href="/pages/dashboard.html">←</a>
+                <a href="/pages/dashboard.html" aria-label="Zum Dashboard">⌂</a>
                 <button type="button" aria-label="Menü öffnen" aria-expanded="false">☰</button>
                 <nav class="menu-nav">
                     <a id="nav-dashboard" href="dashboard.html" class="nav-tile btn btn-primary btn-shadow-inset">Dashboard</a>
+                    <a id="nav-manage" href="manage.html" class="nav-tile btn btn-primary btn-shadow-inset">Daten verwalten</a>
                     <a id="nav-upload" href="upload.html" class="nav-tile btn btn-primary btn-shadow-inset">Bilder Hochladen</a>
                     <a id="nav-transcribe" href="transcribe.html" class="nav-tile btn btn-primary btn-shadow-inset">Bilder digitalisieren</a>
                     <a id="nav-templates" href="templates.html" class="nav-tile btn btn-primary btn-shadow-inset">Templates verwalten</a>
+                    <a id="nav-postits" href="postits.html" class="nav-tile btn btn-primary btn-shadow-inset">Post-its digitalisieren</a>
                     <a id="nav-tag" href="tag.html" class="nav-tile btn btn-primary btn-shadow-inset">Daten vertaggen</a>
+                    <a id="nav-topics" href="topics.html" class="nav-tile btn btn-primary btn-shadow-inset">Topics verwalten</a>
                     <a id="nav-evaluate" href="evaluate.html" class="nav-tile btn btn-primary btn-shadow-inset">Daten auswerten</a>
+                    <a id="nav-cone" href="cone.html" class="nav-tile btn btn-primary btn-shadow-inset">Zukunftskegel</a>
                     <a id="nav-export" href="export.html" class="nav-tile btn btn-primary btn-shadow-inset">Vault/Datenbank exportieren</a>
                 </nav>
             </header>

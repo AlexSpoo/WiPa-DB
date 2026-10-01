@@ -1,5 +1,28 @@
 # DEVLOG
 
+## 2026-10-01 — Fünf neue Seiten: Post-its, Daten verwalten, Vertaggen, Topics, Zukunftskegel
+
+**Ziel:** Den kompletten Auswertungs-Workflow abbilden: von rohem Post-it-Digitalisieren über freies Vertaggen bis zur Konsolidierung in Topics/Szenarien, einer interaktiven Auswertungstabelle mit Graphen und dem Zukunftskegel als Abschlussvisualisierung.
+
+**Umsetzung:**
+- `postits.js`/`.html`: Post-it Digitizer nativ nachgebaut (ursprünglich eigenständiges React-Tool), Batch → Poster-Auswahl → Workspace, Positionen prozentual statt Grid/Kalibrierung.
+- `manage.js`/`.html`: "Daten verwalten" als Projekt→Event-Baum mit Detailansicht, Caching pro Projekt/Event gegen lange Ladezeiten, getrennte Lese-/Bearbeitungsansicht.
+- `tag.js`/`.html`: "Daten vertaggen" — MAXQDA-artige Review-Queue pro Event, freies `Codes`-Feld (bewusst nicht `Tags`, da Obsidian das reserviert und keine Leerzeichen erlaubt), Fokus auf O-Töne statt Stammdaten.
+- `topics.js`/`.html`: "Topics verwalten" — Codes zu Topics, Topics zu Szenarien (many-to-many) zusammenfassen, pro Quartier statt pro Event/global. "Neu berechnen" leitet `Topics`/`Szenario` automatisch aus Codes ab (plus manuelle Hinzufügen/Entfernen-Überschreibung), rührt aber alte, nur manuell gepflegte Dateien nicht an.
+- `evaluate.js`/`.html`: Tabelle zu einer Bases-artigen Ansicht ausgebaut (Spaltenauswahl, Sortierung, Freitextfilter mit Vorschlägen), "Graphen"-Ansicht mit selbstgebauten SVG-Charts (portiert aus dem Data-Explorer-Tool), plus "+ Verknüpftes Feld" zum Nachbauen von Relationsketten wie `Event.Quartier` oder `Person.Event.Quartier`.
+- `cone.js`/`.html` (neu): "Zukunftskegel", portiert aus dem eigenständigen Futures-Cone-Tool — liest `PositionZeitstrahl`/`Wahrscheinlichkeit` direkt aus den Screenshot-Notizen, 5 Darstellungsarten, Split-Modus, freie Farbschemata, SVG-/PNG-Export.
+- `rename.js`/`.html`: dritter Typ "Szenariobild" (freier Name statt fortlaufender Nummer).
+- `app-header.js`: Home-Icon von 🏠 auf schlichtes ⌂ geändert, Navigation um alle neuen Seiten ergänzt.
+- `src-tauri/capabilities/default.json`: `fs:allow-write-file` ergänzt (für den PNG-Export im Zukunftskegel).
+
+**Entscheidungen:** Jede portierte Seite liest live aus dem Vault statt aus eingefügtem JSON. Topics-Zuordnung pro Quartier statt Event, weil das dem bisherigen manuellen Vorgehen (MaxQDA-Export) entspricht. Bei den Wahrscheinlichkeits-Werten im Zukunftskegel beide Schreibweisen ("sicher" und "passiert ziemlich sicher" etc.) zugelassen, weil sich die Formulierung im Vault über die Zeit geändert hat.
+
+**Probleme / Sackgassen:** Erste Version des Zukunftskegels erkannte nur die kurze Schreibweise der Wahrscheinlichkeits-Werte und ließ dadurch einen Großteil der "passiert ziemlich sicher"-Screenshots unter den Tisch fallen — nach dem Testlauf korrigiert.
+
+**Aufwand:** ~20-24h (verteilt über mehrere Sitzungen; grobe Schätzung anhand des Umfangs, keine echte Zeitmessung).
+
+**Offen:** Editierbarkeit von Personen/Screenshot-Inhaltsfeldern in "Daten verwalten"; UI für `Topics hinzugefügt`/`Topics entfernt`-Overrides pro Datei; PNG-Export einzelner Graphen in "Daten auswerten".
+
 ## 2026-09-30 — Bugfixes aus dem zweiten Testdurchlauf
 
 **Ziel:** Drei Probleme beheben, die beim erneuten Testen nach den gestrigen Fixes aufgetaucht sind: Überschreiben bestehender Screenshot-Interpretationen beim Verknüpfen, fehlendes Einordnungs-Feld im Screenshot-Template, und veraltete Anzeige nach Entfernen einer Datenbank.

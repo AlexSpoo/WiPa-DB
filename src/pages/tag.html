@@ -3,13 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WiPa DB - unterseite</title>
+  <title>WiPa DB - Vertaggen</title>
   <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
-    <main class="upload">
-        <h1>unterseite</h1>
-        <a href="dashboard.html">← Zurück</a>
+    <app-header></app-header>
+    <main class="transcribe tag">
+        <div class="transcribe-batches" id="tag-batches">
+            <h1>Daten vertaggen</h1>
+            <p id="tag-batches-empty" class="transcribe-batches-empty is-hidden">Keine Personen/Screenshots gefunden.</p>
+            <ul class="transcribe-batch-list" id="tag-batch-list"></ul>
+        </div>
+
+        <div class="transcribe-edit-view is-hidden" id="tag-review-view">
+            <div class="transcribe-edit-header">
+                <div>
+                    <span id="tag-event-label" class="transcribe-event-label"></span>
+                    <span id="tag-progress" class="transcribe-image-name"></span>
+                </div>
+                <button type="button" id="tag-back-to-batches" class="link-secondary">← Zurück zur Übersicht</button>
+            </div>
+
+            <div class="transcribe-layout">
+                <div class="transcribe-form-column">
+                    <fieldset class="transcribe-category">
+                        <legend>Codes</legend>
+                        <div class="transcribe-field">
+                            <label for="tag-codes-input">Codes</label>
+                            <textarea id="tag-codes-input" rows="6" placeholder="ein Code pro Zeile, nah am Wortlaut"></textarea>
+                        </div>
+                        <div class="transcribe-field">
+                            <label for="tag-interessant-select">Interessantes Beispiel</label>
+                            <select id="tag-interessant-select">
+                                <option value="">–</option>
+                                <option value="ja">ja</option>
+                                <option value="nein">nein</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="transcribe-form-column">
+                    <fieldset class="transcribe-category">
+                        <legend>Bisherige Daten</legend>
+                        <dl class="manage-inspect-list" id="tag-context-list"></dl>
+                    </fieldset>
+                </div>
+            </div>
+
+            <div class="transcribe-actions">
+                <button type="button" id="tag-prev-button" class="btn btn-primary btn-shadow-inset">← Zurück</button>
+                <button type="button" id="tag-next-button" class="btn btn-primary btn-shadow-inset">Speichern &amp; weiter</button>
+            </div>
+        </div>
     </main>
+    <script type="module" src="/shared/app-header.js"></script>
+    <script type="module" src="tag.js"></script>
 </body>
 </html>
