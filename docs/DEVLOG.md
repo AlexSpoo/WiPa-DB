@@ -1,5 +1,24 @@
 # DEVLOG
 
+## 2026-10-02 — Vault 040 produktionsreif gemacht, Zukunftskegel verfeinert
+
+**Ziel:** Vault 040 so aufsetzen, dass die App darauf tatsächlich arbeiten kann (bisher fehlte die Grundstruktur), und den Zukunftskegel anhand von echtem Testen nachschärfen.
+
+**Umsetzung:**
+- Vault: `Projekte/` angelegt (ReFuMoLab, Mosaiq, IAA — fehlte komplett, ohne das lief keine Seite der App auf echten Daten).
+- Vault: `Einstellungen/Templates/` (3 Personen- + 15 Screenshot-Typen) und `Typen/Screenshot-Typen/` aus den 17 bestehenden Obsidian-Templater-Vorlagen migriert, inkl. Event-Zuordnung für alle 7 Events. Dabei zwei echte Schema-Konflikte gefunden und aufgelöst: "Chat" und "Themen des Tages" hatten je nach Projekt unterschiedliche Felder (MOSAIQ-Chat nur 2 statt 3 Nachrichten, MOSAIQ-"Themen des Tages" zusätzlich ein Jahr-Feld) — als eigene Typen "Chat MOSAIQ"/"Themen des Tages MOSAIQ" angelegt.
+- Vault: 4 händisch in Vault 039 ergänzte Topics (mehr Auto, weniger Autos, pro Auto ×2) nach Vault 040 übernommen.
+- `src-tauri/capabilities/default.json`: `fs:allow-write-file` ergänzt (für den PNG-Export im Zukunftskegel).
+- `cone.js`/`styles.css`: Scatter-Modus ("Punkte (verstreut)") mit einstellbarer Größe und Transparenz; Punkte werden nicht mehr an Wahrscheinlichkeits-Zonengrenzen abgeschnitten; alternative Beschriftungen (Pfeil statt Kategorien für die Zeitachse, Pfeile statt Boxen für die Wahrscheinlichkeit); Crop-Ansicht "Nur obere Hälfte" für den ungeteilten Kegel (die untere Hälfte ist dort sonst meist leer); freie Beschriftung jetzt auch ohne Split nutzbar; neue "Aktive Filter"-Übersicht mit Text-Export; alle Sidebar-Kategorien ein-/ausklappbar.
+
+**Entscheidungen:** Bei Namenskonflikten zwischen Projekten (Chat, Themen des Tages) eigene, projektspezifische Typnamen angelegt statt eines gemeinsamen Schemas — damit künftige Einträge pro Projekt weiter die richtigen Felder bekommen, wie es historisch schon der Fall war (vgl. "Maps Garching" vs. "Maps Moosach").
+
+**Probleme / Sackgassen:** Erste Version des Zukunftskegels erkannte nur die kurze Schreibweise der Wahrscheinlichkeits-Werte und ließ dadurch einen Großteil der "passiert ziemlich sicher"-Screenshots unter den Tisch fallen — nach Testlauf korrigiert. Beim Vergleich von Vault 039/040 führte ein CRLF/LF-Unterschied zunächst zu einem stark überzeichneten Diff (sah nach massenhaft fehlenden Daten aus) — war ein Artefakt des Vergleichs-Skripts, kein echter Datenverlust.
+
+**Aufwand:** ~4-5h.
+
+**Offen:** Editierbarkeit von Personen/Screenshot-Inhaltsfeldern in "Daten verwalten"; UI für `Topics hinzugefügt`/`Topics entfernt`-Overrides; der isolierte "TUM Sustainability Day"-Post-it-Batch in Vault 039 (keine zugehörigen Events/Poster/Szenariobilder im Vault).
+
 ## 2026-10-01 — Fünf neue Seiten: Post-its, Daten verwalten, Vertaggen, Topics, Zukunftskegel
 
 **Ziel:** Den kompletten Auswertungs-Workflow abbilden: von rohem Post-it-Digitalisieren über freies Vertaggen bis zur Konsolidierung in Topics/Szenarien, einer interaktiven Auswertungstabelle mit Graphen und dem Zukunftskegel als Abschlussvisualisierung.
