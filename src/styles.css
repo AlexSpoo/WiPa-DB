@@ -2094,3 +2094,41 @@ select option {
   color: var(--color-line);
   font-weight: 600;
 }
+
+.cone-category summary {
+  cursor: pointer;
+  color: var(--color-line);
+  font-weight: 600;
+  list-style: none;
+}
+
+.cone-category summary::-webkit-details-marker {
+  display: none;
+}
+
+.cone-category summary::before {
+  content: "▸ ";
+}
+
+.cone-category[open] summary::before {
+  content: "▾ ";
+}
+
+.cone-category[open] summary {
+  margin-bottom: .5vh;
+}
+
+.cone-filter-summary strong {
+  color: var(--color-line);
+  font-size: .9rem;
+}
+
+.cone-filter-summary ul {
+  margin: .5vh 0 1vh;
+  padding-left: 2vh;
+  font-size: .85rem;
+}
+
+.cone-filter-summary li {
+  margin-bottom: .2vh;
+}

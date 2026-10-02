@@ -215,6 +215,22 @@ function escapeHtml(text) {
     return String(text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Linie mit Pfeilspitze von (x1,y1) nach (x2,y2) — Alternative zu den
+// Kategorie-/Box-Beschriftungen für Zeitachse und Wahrscheinlichkeitszonen.
+function arrowMarkup(x1, y1, x2, y2, color, strokeWidth) {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLength = 10;
+    const headAngle = Math.PI / 7;
+    const hx1 = x2 - headLength * Math.cos(angle - headAngle);
+    const hy1 = y2 - headLength * Math.sin(angle - headAngle);
+    const hx2 = x2 - headLength * Math.cos(angle + headAngle);
+    const hy2 = y2 - headLength * Math.sin(angle + headAngle);
+    return `
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${strokeWidth}" />
+        <polygon points="${x2},${y2} ${hx1},${hy1} ${hx2},${hy2}" fill="${color}" />
+    `;
+}
+
 function getZonePath(halfSpread) {
     const topY = APEX_Y - halfSpread;
     const bottomY = APEX_Y + halfSpread;
@@ -321,6 +337,35 @@ function packDotsInCell(count, cellX, cellWidth, bandTop, bandHeight, radius) {
         for (let c = 0; c < dotsInRow; c++) {
             dots.push({ x: rowStartX + c * step + radius, y: startY + r * step + radius });
         }
+    }
+    return dots;
+}
+
+// Deterministischer Pseudo-Zufall (kein Math.random()), damit die Streuung bei
+// jedem Render gleich bleibt und ein Export reproduzierbar ist — gleicher
+// seed-String ergibt immer denselben Wert.
+function seededRandom01(seedStr) {
+    let h = 0;
+    for (let i = 0; i < seedStr.length; i++) h = (Math.imul(31, h) + seedStr.charCodeAt(i)) | 0;
+    h = Math.imul(h ^ (h >>> 15), h | 1);
+    h ^= h + Math.imul(h ^ (h >>> 7), h | 61);
+    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+}
+
+// Verteilt `count` Punkte zufällig (aber deterministisch pro Zelle/Index)
+// innerhalb einer Zelle, statt sie wie packDotsInCell zu einem sauberen Grid
+// anzuordnen — Punkte dürfen sich dabei überlappen.
+function buildScatterDots(count, cellX, cellWidth, bandTop, bandHeight, seedKey, radius) {
+    if (!count) return [];
+    const marginX = Math.min(cellWidth * 0.12, radius * 1.2);
+    const marginY = Math.min(bandHeight * 0.12, radius * 1.2);
+    const usableWidth = Math.max(1, cellWidth - marginX * 2);
+    const usableHeight = Math.max(1, bandHeight - marginY * 2);
+    const dots = [];
+    for (let i = 0; i < count; i++) {
+        const rx = seededRandom01(`${seedKey}-${i}-x`);
+        const ry = seededRandom01(`${seedKey}-${i}-y`);
+        dots.push({ x: cellX + marginX + rx * usableWidth, y: bandTop + marginY + ry * usableHeight });
     }
     return dots;
 }
@@ -438,11 +483,24 @@ const HEATMAP_CANVAS_SCALE = 0.6;
 function buildConeSvg(opts) {
     const {
         dataTop, dataBottom, columnStart, columnEnd, illustrationUrl,
-        showOutlines, showLabels, splitMode, showSplitLine, externalMaxCount,
-        visualizationMode, heatmapBlobScale, dotRadius, barWidthRatio, barsUniformDirection,
+        showOutlines, showLabels, splitMode, showSplitLine, externalMaxCount, upperHalfOnly,
+        visualizationMode, heatmapBlobScale, dotRadius, scatterRadius, scatterOpacity, barWidthRatio, barsUniformDirection,
         bgColor, lineColor, dataColor, textColor, labelBoxColor, labelTextColor,
         topHalfLabel, bottomHalfLabel,
+        timeLabelStyle, timeArrowStartLabel, timeArrowEndLabel,
+        probabilityLabelStyle, probabilityCenterLabel, probabilityOuterLabel,
     } = opts;
+
+    // Ohne Split-Modus ist die untere Kegelhälfte bei "Punkte"/"Punkte
+    // (verstreut)" immer leer (Daten werden nur einmal, nicht gespiegelt,
+    // platziert) — "Nur obere Hälfte" croppt die Darstellung dann auf genau
+    // den Bereich, der tatsächlich Inhalt zeigt, statt Leerraum zu lassen.
+    const cropToTop = upperHalfOnly && !splitMode;
+    const outerHalfSpread = ZONE_CONFIG[ZONE_ORDER[0]].halfSpread;
+    const bottomMargin = SVG_HEIGHT - (APEX_Y + outerHalfSpread);
+    const effectiveHeight = cropToTop ? APEX_Y + bottomMargin : SVG_HEIGHT;
+    const effectiveTimeLabelY = cropToTop ? effectiveHeight - 20 : TIME_LABEL_Y;
+    const effectiveTimeLabelCenterY = effectiveTimeLabelY - TIME_LABEL_FONT_SIZE * 0.35;
 
     const dataRgb = hexToRgb(dataColor);
     const { counts: countsTop, maxCount: maxCountInternal } = countEntries(dataTop);
@@ -480,7 +538,7 @@ function buildConeSvg(opts) {
             heatmapImages.top = buildHeatmapDataURL(scalePoints(buildHeatmapPoints(countsTop, maxCount, colStartX, colWidth, "top", heatmapBlobScale)), w, h);
             heatmapImages.bottom = buildHeatmapDataURL(scalePoints(buildHeatmapPoints(countsBottom, maxCount, colStartX, colWidth, "bottom", heatmapBlobScale)), w, h);
         } else {
-            heatmapImages.full = buildHeatmapDataURL(scalePoints(buildHeatmapPoints(countsTop, maxCount, colStartX, colWidth, "both", heatmapBlobScale)), w, h);
+            heatmapImages.full = buildHeatmapDataURL(scalePoints(buildHeatmapPoints(countsTop, maxCount, colStartX, colWidth, cropToTop ? "top" : "both", heatmapBlobScale)), w, h);
         }
     }
 
@@ -502,20 +560,6 @@ function buildConeSvg(opts) {
                 const color = getColorForCount(count, maxCount, dataRgb);
                 const isLastColumn = i === NUM_COLUMNS - 1;
                 inner += `<rect x="${x}" y="0" width="${isLastColumn ? w + SVG_WIDTH : w}" height="${SVG_HEIGHT}" fill="${color}" shape-rendering="crispEdges" />`;
-            }
-        } else if (visualizationMode === "dots") {
-            const { center, thickness } = ZONE_RING_INFO[zoneKey];
-            const innerR = center - thickness / 2;
-            const outerR = center + thickness / 2;
-            const bandTop = halfId === "bottom" ? APEX_Y + innerR : APEX_Y - outerR;
-            const dotColor = `rgb(${dataRgb[0]}, ${dataRgb[1]}, ${dataRgb[2]})`;
-            for (let i = 0; i < NUM_COLUMNS; i++) {
-                const count = counts[`${zoneKey}-${i + 1}`] || 0;
-                if (!count) continue;
-                const cellX = colStartX + i * colWidth;
-                for (const p of packDotsInCell(count, cellX, colWidth, bandTop, thickness, dotRadius)) {
-                    inner += `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${dotColor}" fill-opacity="0.85" />`;
-                }
             }
         } else if (visualizationMode === "bars" && maxCount > 0) {
             const { center, thickness } = ZONE_RING_INFO[zoneKey];
@@ -586,8 +630,38 @@ function buildConeSvg(opts) {
         `;
     }
 
-    let svg = `<svg viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">`;
-    svg += `<rect width="${SVG_WIDTH}" height="${SVG_HEIGHT}" fill="${bgColor}" />`;
+    // Einzelne Punkte (Punkte/verstreute Punkte) werden bewusst NICHT wie der
+    // Rest des Zonen-Inhalts in renderZone() an der Zonengrenze beschnitten —
+    // ein Punkt stellt einen einzelnen Eintrag dar, ihn an der Grenze
+    // abzuschneiden sieht nach einem Darstellungsfehler aus, nicht nach Daten.
+    function renderZonePoints(zoneKey, counts, halfId) {
+        if (visualizationMode !== "dots" && visualizationMode !== "scatter") return "";
+        const { center, thickness } = ZONE_RING_INFO[zoneKey];
+        const innerR = center - thickness / 2;
+        const outerR = center + thickness / 2;
+        const bandTop = halfId === "bottom" ? APEX_Y + innerR : APEX_Y - outerR;
+        const dotColor = `rgb(${dataRgb[0]}, ${dataRgb[1]}, ${dataRgb[2]})`;
+        let points = "";
+        for (let i = 0; i < NUM_COLUMNS; i++) {
+            const count = counts[`${zoneKey}-${i + 1}`] || 0;
+            if (!count) continue;
+            const cellX = colStartX + i * colWidth;
+            if (visualizationMode === "dots") {
+                for (const p of packDotsInCell(count, cellX, colWidth, bandTop, thickness, dotRadius)) {
+                    points += `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${dotColor}" fill-opacity="0.85" />`;
+                }
+            } else {
+                const seedKey = `${zoneKey}-${halfId || "full"}-${i}`;
+                for (const p of buildScatterDots(count, cellX, colWidth, bandTop, thickness, seedKey, scatterRadius)) {
+                    points += `<circle cx="${p.x}" cy="${p.y}" r="${scatterRadius}" fill="${dotColor}" fill-opacity="${scatterOpacity}" />`;
+                }
+            }
+        }
+        return points;
+    }
+
+    let svg = `<svg viewBox="0 0 ${SVG_WIDTH} ${effectiveHeight}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect width="${SVG_WIDTH}" height="${effectiveHeight}" fill="${bgColor}" />`;
 
     svg += `<g id="layer-illustration">`;
     if (illustrationUrl) {
@@ -599,7 +673,18 @@ function buildConeSvg(opts) {
         for (const zk of ZONE_ORDER) svg += renderZone(zk, countsTop, "top");
         for (const zk of ZONE_ORDER) svg += renderZone(zk, countsBottom, "bottom");
     } else {
-        for (const zk of ZONE_ORDER) svg += renderZone(zk, countsTop, null);
+        for (const zk of ZONE_ORDER) svg += renderZone(zk, countsTop, cropToTop ? "top" : null);
+    }
+
+    if (visualizationMode === "dots" || visualizationMode === "scatter") {
+        svg += `<g id="layer-data-points">`;
+        if (splitMode) {
+            for (const zk of ZONE_ORDER) svg += renderZonePoints(zk, countsTop, "top");
+            for (const zk of ZONE_ORDER) svg += renderZonePoints(zk, countsBottom, "bottom");
+        } else {
+            for (const zk of ZONE_ORDER) svg += renderZonePoints(zk, countsTop, cropToTop ? "top" : null);
+        }
+        svg += `</g>`;
     }
 
     if (visualizationMode === "heatmap") {
@@ -607,6 +692,8 @@ function buildConeSvg(opts) {
         if (splitMode) {
             svg += `<clipPath id="clip-heatmap-top"><path d="${getZoneTopPath(ZONE_CONFIG[ZONE_ORDER[0]].halfSpread)}" /></clipPath>`;
             svg += `<clipPath id="clip-heatmap-bottom"><path d="${getZoneBottomPath(ZONE_CONFIG[ZONE_ORDER[0]].halfSpread)}" /></clipPath>`;
+        } else if (cropToTop) {
+            svg += `<clipPath id="clip-heatmap-full"><path d="${getZoneTopPath(ZONE_CONFIG[ZONE_ORDER[0]].halfSpread)}" /></clipPath>`;
         } else {
             svg += `<clipPath id="clip-heatmap-full"><path d="${getZonePath(ZONE_CONFIG[ZONE_ORDER[0]].halfSpread)}" /></clipPath>`;
         }
@@ -623,7 +710,8 @@ function buildConeSvg(opts) {
     if (showOutlines) {
         svg += `<g id="layer-outlines">`;
         for (const zoneKey of ZONE_ORDER) {
-            svg += `<path d="${getZonePath(ZONE_CONFIG[zoneKey].halfSpread)}" fill="none" stroke="${lineColor}" stroke-width="1.8" />`;
+            const path = cropToTop ? getZoneTopPath(ZONE_CONFIG[zoneKey].halfSpread) : getZonePath(ZONE_CONFIG[zoneKey].halfSpread);
+            svg += `<path d="${path}" fill="none" stroke="${lineColor}" stroke-width="1.8" />`;
         }
         if (splitMode && showSplitLine) {
             svg += `<line x1="0" y1="${APEX_Y}" x2="${SVG_WIDTH}" y2="${APEX_Y}" stroke="${lineColor}" stroke-width="1.8" />`;
@@ -632,17 +720,30 @@ function buildConeSvg(opts) {
     }
 
     if (showLabels) {
-        svg += buildLabelsLayer({ splitMode, topHalfLabel, bottomHalfLabel, textColor, labelBoxColor, labelTextColor, lineColor, visualizationMode, maxCount, dataRgb });
+        svg += buildLabelsLayer({
+            splitMode, cropToTop, topHalfLabel, bottomHalfLabel, textColor, labelBoxColor, labelTextColor, lineColor,
+            visualizationMode, maxCount, dataRgb,
+            timeLabelStyle, timeArrowStartLabel, timeArrowEndLabel, effectiveTimeLabelY, effectiveTimeLabelCenterY,
+            probabilityLabelStyle, probabilityCenterLabel, probabilityOuterLabel,
+        });
     }
 
     svg += `</svg>`;
     return svg;
 }
 
-function buildLabelsLayer({ splitMode, topHalfLabel, bottomHalfLabel, textColor, labelBoxColor, labelTextColor, lineColor, visualizationMode, maxCount, dataRgb }) {
+function buildLabelsLayer({
+    splitMode, cropToTop, topHalfLabel, bottomHalfLabel, textColor, labelBoxColor, labelTextColor, lineColor,
+    visualizationMode, maxCount, dataRgb,
+    timeLabelStyle, timeArrowStartLabel, timeArrowEndLabel, effectiveTimeLabelY, effectiveTimeLabelCenterY,
+    probabilityLabelStyle, probabilityCenterLabel, probabilityOuterLabel,
+}) {
     let svg = `<g id="layer-labels">`;
 
-    if (splitMode && (topHalfLabel || bottomHalfLabel)) {
+    // topHalfLabel ist auch ohne Split-Modus nutzbar (einzelne Beschriftung
+    // für den ganzen/oberen Kegel) — bottomHalfLabel ergibt nur mit Split
+    // Sinn, da es sonst keine zweite Hälfte mit eigenen Daten gibt.
+    if (topHalfLabel || (splitMode && bottomHalfLabel)) {
         const outerHalfSpread = ZONE_CONFIG[ZONE_ORDER[0]].halfSpread;
         const x = 75;
         const lineHeight = 22;
@@ -654,33 +755,63 @@ function buildLabelsLayer({ splitMode, topHalfLabel, bottomHalfLabel, textColor,
             ).join("");
         };
         if (topHalfLabel) svg += renderHalfLabel(topHalfLabel, APEX_Y - outerHalfSpread / 2);
-        if (bottomHalfLabel) svg += renderHalfLabel(bottomHalfLabel, APEX_Y + outerHalfSpread / 2);
+        if (splitMode && bottomHalfLabel) svg += renderHalfLabel(bottomHalfLabel, APEX_Y + outerHalfSpread / 2);
     }
 
-    for (const [key, zone] of Object.entries(ZONE_CONFIG)) {
+    if (probabilityLabelStyle === "arrows") {
+        // Alternative zu den drei Zonen-Boxen: zwei Pfeile von der Mittellinie
+        // nach außen (oben/unten), ein Label in der Mitte, dasselbe Label an
+        // beiden Pfeilspitzen — passend zum symmetrischen Aufbau des Kegels.
         const labelX = CONE_END_X + 32;
-        const lines = zone.label.split("\n");
-        let labelY;
-        if (key === "sicher") labelY = APEX_Y - 14;
-        else if (key === "könnte") labelY = APEX_Y - zone.halfSpread + 42;
-        else labelY = APEX_Y - zone.halfSpread + 68;
-        svg += `<g><rect x="${labelX - 6}" y="${labelY - 16}" width="114" height="${lines.length * 18 + 10}" rx="3" fill="${labelBoxColor}" />`;
-        lines.forEach((line, i) => {
-            svg += `<text x="${labelX + 2}" y="${labelY + i * 18}" fill="${labelTextColor}" font-size="13" font-family="${FONT_FAMILY}" font-weight="600">${escapeXml(line)}</text>`;
-        });
-        svg += `</g>`;
+        const outerHalfSpread = ZONE_CONFIG[ZONE_ORDER[0]].halfSpread;
+        svg += arrowMarkup(labelX, APEX_Y, labelX, APEX_Y - outerHalfSpread, lineColor, 2);
+        svg += `<text x="${labelX + 10}" y="${APEX_Y + 5}" text-anchor="start" fill="${textColor}" font-size="14" font-family="${FONT_FAMILY}" font-weight="600">${escapeXml(probabilityCenterLabel)}</text>`;
+        svg += `<text x="${labelX}" y="${APEX_Y - outerHalfSpread - 10}" text-anchor="middle" fill="${textColor}" font-size="14" font-family="${FONT_FAMILY}" font-weight="600">${escapeXml(probabilityOuterLabel)}</text>`;
+        // Beim Croppen auf die obere Hälfte liegt der untere Pfeil außerhalb
+        // des sichtbaren Bereichs — konsequent weglassen statt abzuschneiden.
+        if (!cropToTop) {
+            svg += arrowMarkup(labelX, APEX_Y, labelX, APEX_Y + outerHalfSpread, lineColor, 2);
+            svg += `<text x="${labelX}" y="${APEX_Y + outerHalfSpread + 22}" text-anchor="middle" fill="${textColor}" font-size="14" font-family="${FONT_FAMILY}" font-weight="600">${escapeXml(probabilityOuterLabel)}</text>`;
+        }
+    } else {
+        for (const [key, zone] of Object.entries(ZONE_CONFIG)) {
+            const labelX = CONE_END_X + 32;
+            const lines = zone.label.split("\n");
+            let labelY;
+            // "sicher" sitzt normalerweise mittig in seiner (in der Vollansicht
+            // oben UND unten sichtbaren) Innenfläche nahe der Mittellinie. Beim
+            // Croppen auf die obere Hälfte fehlt dieser Platz darunter — dort
+            // genauso wie bei "könnte" am oberen Rand der eigenen Zone
+            // positionieren, sonst überlappt die Box mit der Zeitachse.
+            if (key === "sicher" && !cropToTop) labelY = APEX_Y - 14;
+            else if (key === "könnte" || key === "sicher") labelY = APEX_Y - zone.halfSpread + 42;
+            else labelY = APEX_Y - zone.halfSpread + 68;
+            svg += `<g><rect x="${labelX - 6}" y="${labelY - 16}" width="114" height="${lines.length * 18 + 10}" rx="3" fill="${labelBoxColor}" />`;
+            lines.forEach((line, i) => {
+                svg += `<text x="${labelX + 2}" y="${labelY + i * 18}" fill="${labelTextColor}" font-size="13" font-family="${FONT_FAMILY}" font-weight="600">${escapeXml(line)}</text>`;
+            });
+            svg += `</g>`;
+        }
     }
 
-    for (const { label, pos } of TIME_ZONE_LABELS) {
-        const x = FLATTEN_X + (CONE_END_X - FLATTEN_X) * pos;
-        svg += `<text x="${x}" y="${TIME_LABEL_Y}" text-anchor="middle" fill="${textColor}" font-size="${TIME_LABEL_FONT_SIZE}" font-family="${FONT_FAMILY}">${escapeXml(label)}</text>`;
-    }
+    if (timeLabelStyle === "arrow") {
+        // Alternative zu den drei Kategorie-Beschriftungen: ein einzelner Pfeil
+        // über die gesamte Zeitachse, mit je einem Label am Anfang und am Ende.
+        svg += arrowMarkup(FLATTEN_X, effectiveTimeLabelY, CONE_END_X, effectiveTimeLabelY, lineColor, 2);
+        svg += `<text x="${FLATTEN_X}" y="${effectiveTimeLabelY - 10}" text-anchor="start" fill="${textColor}" font-size="${TIME_LABEL_FONT_SIZE}" font-family="${FONT_FAMILY}">${escapeXml(timeArrowStartLabel)}</text>`;
+        svg += `<text x="${CONE_END_X}" y="${effectiveTimeLabelY - 10}" text-anchor="end" fill="${textColor}" font-size="${TIME_LABEL_FONT_SIZE}" font-family="${FONT_FAMILY}">${escapeXml(timeArrowEndLabel)}</text>`;
+    } else {
+        for (const { label, pos } of TIME_ZONE_LABELS) {
+            const x = FLATTEN_X + (CONE_END_X - FLATTEN_X) * pos;
+            svg += `<text x="${x}" y="${effectiveTimeLabelY}" text-anchor="middle" fill="${textColor}" font-size="${TIME_LABEL_FONT_SIZE}" font-family="${FONT_FAMILY}">${escapeXml(label)}</text>`;
+        }
 
-    for (let i = 0; i < TIME_ZONE_LABELS.length - 1; i++) {
-        const pos = (TIME_ZONE_LABELS[i].pos + TIME_ZONE_LABELS[i + 1].pos) / 2;
-        const x = FLATTEN_X + (CONE_END_X - FLATTEN_X) * pos;
-        const tickHalfHeight = 7;
-        svg += `<line x1="${x}" y1="${TIME_LABEL_CENTER_Y - tickHalfHeight}" x2="${x}" y2="${TIME_LABEL_CENTER_Y + tickHalfHeight}" stroke="${lineColor}" stroke-width="1.5" />`;
+        for (let i = 0; i < TIME_ZONE_LABELS.length - 1; i++) {
+            const pos = (TIME_ZONE_LABELS[i].pos + TIME_ZONE_LABELS[i + 1].pos) / 2;
+            const x = FLATTEN_X + (CONE_END_X - FLATTEN_X) * pos;
+            const tickHalfHeight = 7;
+            svg += `<line x1="${x}" y1="${effectiveTimeLabelCenterY - tickHalfHeight}" x2="${x}" y2="${effectiveTimeLabelCenterY + tickHalfHeight}" stroke="${lineColor}" stroke-width="1.5" />`;
+        }
     }
 
     if (visualizationMode === "grid" || visualizationMode === "heatmap") {
@@ -751,6 +882,8 @@ const state = {
     visualizationMode: "grid",
     heatmapBlobScale: 1.15,
     dotRadius: 5,
+    scatterRadius: 8,
+    scatterOpacity: 0.5,
     barWidthRatio: 0.7,
     barsUniformDirection: false,
     colorSchemeKey: "standard",
@@ -763,11 +896,19 @@ const state = {
     illustrationUrl: null,
     activeTab: "settings",
     splitMode: false,
+    upperHalfOnly: false,
     splitSubTab: "oben",
     showSplitLine: false,
     topHalfLabel: "",
     bottomHalfLabel: "",
+    timeLabelStyle: "categories",
+    timeArrowStartLabel: "",
+    timeArrowEndLabel: "",
+    probabilityLabelStyle: "boxes",
+    probabilityCenterLabel: "",
+    probabilityOuterLabel: "",
     openDropdown: null,
+    collapsedCategories: new Set(),
     filtersA: emptyFilters(),
     filtersB: emptyFilters(),
 };
@@ -807,6 +948,27 @@ function distinctArrayValues(entries, key) {
     return [...set].sort((a, b) => a.localeCompare(b, "de"));
 }
 
+// Für die Anzeige/den Export der aktuell aktiven Filter (z. B. um nachträglich
+// zu dokumentieren, welche Szenarien/Topics in einen Export eingeflossen sind).
+const FILTER_CATEGORY_LABELS = [
+    ["szenarien", "Szenarien"],
+    ["topics", "Topics"],
+    ["einordnung", "Einordnung"],
+    ["geschlecht", "Geschlecht"],
+    ["leitfrage", "Leitfrage"],
+    ["alter", "Alter"],
+    ["personengruppe", "Personengruppe"],
+    ["event", "Event"],
+];
+
+function describeFilters(filters) {
+    const parts = [];
+    for (const [key, label] of FILTER_CATEGORY_LABELS) {
+        if (filters[key].size > 0) parts.push(`${label}: ${[...filters[key]].join(", ")}`);
+    }
+    return parts.length > 0 ? parts : ["(keine Filter aktiv)"];
+}
+
 function dataUrlToBytes(dataUrl) {
     const base64 = dataUrl.split(",")[1];
     const binary = atob(base64);
@@ -831,9 +993,15 @@ function buildSettingsTabHtml() {
         { key: "event", label: "Event", values: distinctValues(allEntries, "event") },
     ];
 
+    // offen/geschlossen pro Kategorie bleibt über Re-Renders hinweg erhalten
+    // (siehe state.collapsedCategories + der "toggle"-Listener unten) — sonst
+    // würde jede Einstellungsänderung woanders in der Sidebar das Einklappen
+    // wieder zurücksetzen.
+    const open = (key) => (state.collapsedCategories.has(key) ? "" : "open");
+
     return `
-        <div class="transcribe-category">
-            <legend>Zeitausschnitt</legend>
+        <details class="transcribe-category cone-category" data-category="zeitausschnitt" ${open("zeitausschnitt")}>
+            <summary>Zeitausschnitt</summary>
             <div class="transcribe-field">
                 <label>Spaltenstart: <span data-label-for="columnStart">${state.columnStart}</span></label>
                 <input type="range" min="0" max="${NUM_COLUMNS - 1}" value="${state.columnStart}" data-field="columnStart">
@@ -842,10 +1010,10 @@ function buildSettingsTabHtml() {
                 <label>Spaltenende: <span data-label-for="columnEnd">${state.columnEnd}</span></label>
                 <input type="range" min="1" max="${NUM_COLUMNS}" value="${state.columnEnd}" data-field="columnEnd">
             </div>
-        </div>
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Anzeige</legend>
+        <details class="transcribe-category cone-category" data-category="anzeige" ${open("anzeige")}>
+            <summary>Anzeige</summary>
             <label class="evaluate-chart-checkbox">
                 <input type="checkbox" data-field="showOutlines" ${state.showOutlines ? "checked" : ""}>
                 Kegelumrisse
@@ -854,10 +1022,44 @@ function buildSettingsTabHtml() {
                 <input type="checkbox" data-field="showLabels" ${state.showLabels ? "checked" : ""}>
                 Beschriftungen
             </label>
-        </div>
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Farbschema</legend>
+        <details class="transcribe-category cone-category" data-category="zeit-beschriftung" ${open("zeit-beschriftung")}>
+            <summary>Zeitachsen-Beschriftung</summary>
+            <div class="transcribe-choice-group">
+                ${[["categories", "Kategorien"], ["arrow", "Pfeil"]].map(([key, label]) => `<button type="button" class="transcribe-choice ${state.timeLabelStyle === key ? "is-selected" : ""}" data-field-choice="timeLabelStyle" data-choice-value="${key}">${label}</button>`).join("")}
+            </div>
+            ${state.timeLabelStyle === "arrow" ? `
+                <div class="transcribe-field">
+                    <label>Beschriftung Anfang</label>
+                    <textarea rows="1" data-field="timeArrowStartLabel" placeholder="z. B. jetzt">${escapeHtml(state.timeArrowStartLabel)}</textarea>
+                </div>
+                <div class="transcribe-field">
+                    <label>Beschriftung Ende</label>
+                    <textarea rows="1" data-field="timeArrowEndLabel" placeholder="z. B. ferne Zukunft">${escapeHtml(state.timeArrowEndLabel)}</textarea>
+                </div>
+            ` : ""}
+        </details>
+
+        <details class="transcribe-category cone-category" data-category="wahrscheinlichkeit-beschriftung" ${open("wahrscheinlichkeit-beschriftung")}>
+            <summary>Wahrscheinlichkeits-Beschriftung</summary>
+            <div class="transcribe-choice-group">
+                ${[["boxes", "Boxen"], ["arrows", "Pfeile"]].map(([key, label]) => `<button type="button" class="transcribe-choice ${state.probabilityLabelStyle === key ? "is-selected" : ""}" data-field-choice="probabilityLabelStyle" data-choice-value="${key}">${label}</button>`).join("")}
+            </div>
+            ${state.probabilityLabelStyle === "arrows" ? `
+                <div class="transcribe-field">
+                    <label>Beschriftung Mitte</label>
+                    <textarea rows="1" data-field="probabilityCenterLabel" placeholder="z. B. sicher">${escapeHtml(state.probabilityCenterLabel)}</textarea>
+                </div>
+                <div class="transcribe-field">
+                    <label>Beschriftung außen (oben &amp; unten)</label>
+                    <textarea rows="1" data-field="probabilityOuterLabel" placeholder="z. B. unsicher">${escapeHtml(state.probabilityOuterLabel)}</textarea>
+                </div>
+            ` : ""}
+        </details>
+
+        <details class="transcribe-category cone-category" data-category="farbschema" ${open("farbschema")}>
+            <summary>Farbschema</summary>
             <select data-field="colorSchemeKey">
                 ${Object.entries(COLOR_SCHEMES).map(([key, scheme]) => `<option value="${key}" ${state.colorSchemeKey === key ? "selected" : ""}>${scheme.name}</option>`).join("")}
             </select>
@@ -872,13 +1074,13 @@ function buildSettingsTabHtml() {
                     </div>
                 `).join("")}
             </div>
-        </div>
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Darstellung</legend>
+        <details class="transcribe-category cone-category" data-category="darstellung" ${open("darstellung")}>
+            <summary>Darstellung</summary>
             <div class="transcribe-choice-group">
                 ${[
-                    ["grid", "Raster"], ["heatmap", "Heatmap"], ["dots", "Punkte"],
+                    ["grid", "Raster"], ["heatmap", "Heatmap"], ["dots", "Punkte"], ["scatter", "Punkte (verstreut)"],
                     ["bars", "Balken"], ["bigzones", "Großzonen"],
                 ].map(([key, label]) => `<button type="button" class="transcribe-choice ${state.visualizationMode === key ? "is-selected" : ""}" data-mode="${key}">${label}</button>`).join("")}
             </div>
@@ -894,6 +1096,16 @@ function buildSettingsTabHtml() {
                     <input type="range" min="2.5" max="9" step="0.5" value="${state.dotRadius}" data-field="dotRadius">
                 </div>
             ` : ""}
+            ${state.visualizationMode === "scatter" ? `
+                <div class="transcribe-field">
+                    <label>Punktgröße: <span data-label-for="scatterRadius">${state.scatterRadius.toFixed(1)}</span>px</label>
+                    <input type="range" min="3" max="60" step="0.5" value="${state.scatterRadius}" data-field="scatterRadius">
+                </div>
+                <div class="transcribe-field">
+                    <label>Transparenz: <span data-label-for="scatterOpacity">${Math.round(state.scatterOpacity * 100)}</span>%</label>
+                    <input type="range" min="0.05" max="1" step="0.05" value="${state.scatterOpacity}" data-field="scatterOpacity">
+                </div>
+            ` : ""}
             ${(state.visualizationMode === "bars" || state.visualizationMode === "bigzones") ? `
                 <div class="transcribe-field">
                     <label>Balkenbreite: <span data-label-for="barWidthRatio">${Math.round(state.barWidthRatio * 100)}</span>%</label>
@@ -906,10 +1118,10 @@ function buildSettingsTabHtml() {
                     </label>
                 ` : ""}
             ` : ""}
-        </div>
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Kegel teilen</legend>
+        <details class="transcribe-category cone-category" data-category="split" ${open("split")}>
+            <summary>Kegel teilen</summary>
             <label class="evaluate-chart-checkbox">
                 <input type="checkbox" data-field="splitMode" ${state.splitMode ? "checked" : ""}>
                 Kegel in zwei Hälften teilen
@@ -931,34 +1143,43 @@ function buildSettingsTabHtml() {
                     <button type="button" class="evaluate-view-tab ${state.splitSubTab === "oben" ? "is-active" : ""}" data-subtab="oben">Oben</button>
                     <button type="button" class="evaluate-view-tab ${state.splitSubTab === "unten" ? "is-active" : ""}" data-subtab="unten">Unten</button>
                 </div>
-            ` : ""}
-        </div>
+            ` : `
+                <label class="evaluate-chart-checkbox">
+                    <input type="checkbox" data-field="upperHalfOnly" ${state.upperHalfOnly ? "checked" : ""}>
+                    Nur obere Hälfte anzeigen (untere ist ohne Teilung meist leer)
+                </label>
+                <div class="transcribe-field">
+                    <label>Beschriftung</label>
+                    <textarea rows="2" data-field="topHalfLabel" placeholder="z. B. Alle Befragten">${escapeHtml(state.topHalfLabel)}</textarea>
+                </div>
+            `}
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Illustration</legend>
+        <details class="transcribe-category cone-category" data-category="illustration" ${open("illustration")}>
+            <summary>Illustration</summary>
             <input type="file" accept="image/*" id="cone-illustration-input">
             ${state.illustrationUrl ? `<button type="button" class="link-secondary" data-action="remove-illustration">Bild entfernen</button>` : ""}
-        </div>
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Szenarien${state.splitMode ? ` (${state.splitSubTab})` : ""}</legend>
+        <details class="transcribe-category cone-category" data-category="szenarien" ${open("szenarien")}>
+            <summary>Szenarien${state.splitMode ? ` (${state.splitSubTab})` : ""}</summary>
             ${distinctArrayValues(allEntries, "szenarien").map((s) => `
                 <label class="evaluate-chart-checkbox">
                     <input type="checkbox" data-filter-category="szenarien" data-filter-value="${escapeHtml(s)}" ${filters.szenarien.has(s) ? "checked" : ""}>
                     ${escapeHtml(s)}
                 </label>
             `).join("") || `<p class="transcribe-static">Keine Szenarien vorhanden.</p>`}
-        </div>
+        </details>
 
-        <div class="transcribe-category">
-            <legend>Topics${state.splitMode ? ` (${state.splitSubTab})` : ""}</legend>
+        <details class="transcribe-category cone-category" data-category="topics" ${open("topics")}>
+            <summary>Topics${state.splitMode ? ` (${state.splitSubTab})` : ""}</summary>
             ${distinctArrayValues(allEntries, "topics").map((t) => `
                 <label class="evaluate-chart-checkbox">
                     <input type="checkbox" data-filter-category="topics" data-filter-value="${escapeHtml(t)}" ${filters.topics.has(t) ? "checked" : ""}>
                     ${escapeHtml(t)}
                 </label>
             `).join("") || `<p class="transcribe-static">Keine Topics vorhanden.</p>`}
-        </div>
+        </details>
 
         ${dropdowns.map(({ key, label, values }) => `
             <div class="cone-dropdown">
@@ -975,6 +1196,25 @@ function buildSettingsTabHtml() {
                 ` : ""}
             </div>
         `).join("")}
+
+        <details class="transcribe-category cone-category" data-category="filter-uebersicht" ${open("filter-uebersicht")}>
+            <summary>Aktive Filter</summary>
+            ${state.splitMode ? `
+                <div class="cone-filter-summary">
+                    <strong>Oben</strong>
+                    <ul>${describeFilters(state.filtersA).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+                </div>
+                <div class="cone-filter-summary">
+                    <strong>Unten</strong>
+                    <ul>${describeFilters(state.filtersB).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+                </div>
+            ` : `
+                <div class="cone-filter-summary">
+                    <ul>${describeFilters(state.filtersA).map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+                </div>
+            `}
+            <button type="button" class="link-secondary" id="cone-export-filters-button">Filter als Text exportieren</button>
+        </details>
 
         <div class="cone-overview">
             <div class="cone-overview-title">Übersicht${state.splitMode ? ` (${state.splitSubTab})` : ""}</div>
@@ -1042,6 +1282,35 @@ function renderSidebar() {
 
     const reloadButton = sidebarContentEl.querySelector("#cone-reload-button");
     if (reloadButton) reloadButton.addEventListener("click", async () => { await reloadData(); renderAll(); });
+
+    const exportFiltersButton = sidebarContentEl.querySelector("#cone-export-filters-button");
+    if (exportFiltersButton) {
+        exportFiltersButton.addEventListener("click", async () => {
+            const lines = [];
+            if (state.splitMode) {
+                lines.push("Oben:");
+                for (const p of describeFilters(state.filtersA)) lines.push(`  ${p}`);
+                lines.push("");
+                lines.push("Unten:");
+                for (const p of describeFilters(state.filtersB)) lines.push(`  ${p}`);
+            } else {
+                for (const p of describeFilters(state.filtersA)) lines.push(p);
+            }
+            const filePath = await save({ defaultPath: "zukunftskegel-filter.txt", filters: [{ name: "Text", extensions: ["txt"] }] });
+            if (!filePath) return;
+            await writeTextFile(filePath, lines.join("\n"));
+        });
+    }
+
+    // Auf/zu merken, ohne neu zu rendern — der Browser hat die Sektion schon
+    // sichtbar umgeschaltet, ein renderAll() würde das nur unnötig wiederholen.
+    for (const details of sidebarContentEl.querySelectorAll(".cone-category")) {
+        details.addEventListener("toggle", () => {
+            const key = details.dataset.category;
+            if (details.open) state.collapsedCategories.delete(key);
+            else state.collapsedCategories.add(key);
+        });
+    }
 }
 
 function renderCanvas() {
@@ -1062,9 +1331,12 @@ function renderCanvas() {
         showLabels: state.showLabels,
         splitMode: state.splitMode,
         showSplitLine: state.showSplitLine,
+        upperHalfOnly: state.upperHalfOnly,
         visualizationMode: state.visualizationMode,
         heatmapBlobScale: state.heatmapBlobScale,
         dotRadius: state.dotRadius,
+        scatterRadius: state.scatterRadius,
+        scatterOpacity: state.scatterOpacity,
         barWidthRatio: state.barWidthRatio,
         barsUniformDirection: state.barsUniformDirection,
         bgColor: state.bgColor,
@@ -1075,6 +1347,12 @@ function renderCanvas() {
         labelTextColor: state.labelTextColor,
         topHalfLabel: state.topHalfLabel,
         bottomHalfLabel: state.bottomHalfLabel,
+        timeLabelStyle: state.timeLabelStyle,
+        timeArrowStartLabel: state.timeArrowStartLabel,
+        timeArrowEndLabel: state.timeArrowEndLabel,
+        probabilityLabelStyle: state.probabilityLabelStyle,
+        probabilityCenterLabel: state.probabilityCenterLabel,
+        probabilityOuterLabel: state.probabilityOuterLabel,
     });
 
     subtitleEl.textContent = `${filteredA.length} von ${allEntries.length} Einträgen sichtbar`;
@@ -1095,6 +1373,13 @@ function renderAll() {
 sidebarContentEl.addEventListener("click", (event) => {
     const modeButton = event.target.closest("[data-mode]");
     if (modeButton) { state.visualizationMode = modeButton.dataset.mode; renderAll(); return; }
+
+    const choiceButton = event.target.closest("[data-field-choice]");
+    if (choiceButton) {
+        state[choiceButton.dataset.fieldChoice] = choiceButton.dataset.choiceValue;
+        renderAll();
+        return;
+    }
 
     const subtabButton = event.target.closest("[data-subtab]");
     if (subtabButton) { state.splitSubTab = subtabButton.dataset.subtab; state.openDropdown = null; renderAll(); return; }
@@ -1147,8 +1432,8 @@ sidebarContentEl.addEventListener("input", (event) => {
         state[field] = Number(target.value);
         const labelSpan = sidebarContentEl.querySelector(`[data-label-for="${field}"]`);
         if (labelSpan) {
-            if (field === "barWidthRatio") labelSpan.textContent = Math.round(state[field] * 100);
-            else if (field === "dotRadius") labelSpan.textContent = state[field].toFixed(1);
+            if (field === "barWidthRatio" || field === "scatterOpacity") labelSpan.textContent = Math.round(state[field] * 100);
+            else if (field === "dotRadius" || field === "scatterRadius") labelSpan.textContent = state[field].toFixed(1);
             else if (field === "heatmapBlobScale") labelSpan.textContent = state[field].toFixed(2);
             else labelSpan.textContent = state[field];
         }
