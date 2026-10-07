@@ -201,14 +201,15 @@ async function computeNextScreenshotNumber(eventName, typeKürzel, screenshotTyp
     const pattern = new RegExp(`^${prefix}${typeKürzel}-(\\d+)`);
 
     // Präfix + Kürzel sind pro Projekt fest, nicht pro Event — die Nummerierung
-    // ist also projektweit eindeutig. Deshalb über alle Events desselben
-    // Projekts scannen (z. B. Garching 1 UND 2), sonst können zwei Events
-    // versehentlich dieselbe Nummer vergeben.
-    const relatedEventNames = Object.keys(eventInfo).filter((name) => eventInfo[name]?.projektName === projektName);
-    for (const relatedEventName of relatedEventNames) {
-        const eventPath = await resolveEventFolder(screenshotDir, relatedEventName);
-        if (!(await exists(eventPath))) continue;
-        const files = await readDir(eventPath);
+    // ist also projektweit eindeutig und am Dateinamen selbst erkennbar.
+    // Deshalb direkt alle Unterordner von Screenshots(RAW) durchsuchen statt
+    // über resolveEventFolder(eventName) aufzulösen: historische Rohordner
+    // heißen nicht immer wie das Event (z. B. "G 1" statt "Garching 1"), und
+    // manche enthalten Screenshots mehrerer Events gemischt.
+    for (const entry of await readDir(screenshotDir)) {
+        if (!entry.isDirectory) continue;
+        const folderPath = await join(screenshotDir, entry.name);
+        const files = await readDir(folderPath);
         for (const file of files) {
             const match = file.name.match(pattern);
             if (!match) continue;

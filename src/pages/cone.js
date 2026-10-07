@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { join, basename } from "@tauri-apps/api/path";
-import { readDir, readTextFile, writeTextFile, writeFile, exists } from "@tauri-apps/plugin-fs";
-import { save } from "@tauri-apps/plugin-dialog";
-import { load as loadYaml } from "js-yaml";
+import { readDir, readTextFile, writeTextFile, writeFile, mkdir, remove, exists } from "@tauri-apps/plugin-fs";
+import { save, confirm } from "@tauri-apps/plugin-dialog";
+import { load as loadYaml, dump as dumpYaml } from "js-yaml";
 import { load as loadStore } from "@tauri-apps/plugin-store";
 
 // Portiert aus dem eigenständigen "Futures Cone"-Tool (kleine data tools für
@@ -18,6 +18,7 @@ import { load as loadStore } from "@tauri-apps/plugin-store";
 const subtitleEl = document.querySelector("#cone-subtitle");
 const exportSvgButton = document.querySelector("#cone-export-svg-button");
 const exportPngButton = document.querySelector("#cone-export-png-button");
+const exportTableButton = document.querySelector("#cone-export-table-button");
 const tabSettingsButton = document.querySelector("#cone-tab-settings-button");
 const tabDataButton = document.querySelector("#cone-tab-data-button");
 const sidebarContentEl = document.querySelector("#cone-sidebar-content");
@@ -31,6 +32,7 @@ await invoke("expand_scope", { folderPath: activeVault });
 const projekteDir = await join(activeVault, "Projekte");
 const personenDir = await join(activeVault, "Personen");
 const screenshotsDir = await join(activeVault, "Screenshots");
+const presetsDir = await join(activeVault, "Einstellungen", "Kegel-Voreinstellungen");
 
 function extractWikilinkTarget(value) {
     if (typeof value !== "string") return value;
@@ -969,6 +971,109 @@ function describeFilters(filters) {
     return parts.length > 0 ? parts : ["(keine Filter aktiv)"];
 }
 
+// ---- Tabellen-Export ----
+// Exportiert die Rohdaten hinter der aktuellen Ansicht (eine Zeile pro
+// Screenshot-Eintrag) — Ergänzung zu SVG/PNG, falls die Zahlen/Inhalte
+// hinter dem Kegel direkt weiterverarbeitet werden sollen.
+
+const TABLE_EXPORT_COLUMNS = ["Zeit", "Wahrscheinlichkeit", "Szenarien", "Topics", "Einordnung", "Geschlecht", "Leitfrage", "Alter", "Personengruppe", "Event"];
+
+function entryToTableRow(entry) {
+    return [
+        entry.time,
+        ZONE_CONFIG[entry.probability].label.replace(/\n/g, " "),
+        entry.szenarien.join("; "),
+        entry.topics.join("; "),
+        entry.einordnung,
+        entry.geschlecht,
+        entry.leitfrage,
+        entry.alter,
+        entry.personengruppe,
+        entry.event,
+    ];
+}
+
+function toCsv(columns, rows) {
+    const escapeCell = (value) => {
+        const text = String(value ?? "");
+        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const lines = [columns.map(escapeCell).join(",")];
+    for (const row of rows) lines.push(row.map(escapeCell).join(","));
+    return lines.join("\r\n");
+}
+
+// ---- Voreinstellungen (Filter + Darstellungs-Einstellungen als Ganzes) ----
+// Liegen als eigene Notizen im Vault statt in app-eigenem Speicher, damit sie
+// wie alles andere portabel sind und mit dem Vault mitwandern.
+
+const PRESET_FIELDS = [
+    "columnStart", "columnEnd", "showOutlines", "showLabels",
+    "timeLabelStyle", "timeArrowStartLabel", "timeArrowEndLabel",
+    "probabilityLabelStyle", "probabilityCenterLabel", "probabilityOuterLabel",
+    "colorSchemeKey", "bgColor", "lineColor", "dataColor", "textColor", "labelBoxColor", "labelTextColor",
+    "visualizationMode", "heatmapBlobScale", "dotRadius", "scatterRadius", "scatterOpacity",
+    "barWidthRatio", "barsUniformDirection",
+    "splitMode", "upperHalfOnly", "showSplitLine", "topHalfLabel", "bottomHalfLabel",
+];
+
+function serializeFilters(filters) {
+    const out = {};
+    for (const [key] of FILTER_CATEGORY_LABELS) out[key] = [...filters[key]];
+    return out;
+}
+
+function deserializeFilters(data) {
+    const filters = emptyFilters();
+    for (const [key] of FILTER_CATEGORY_LABELS) {
+        for (const v of data?.[key] ?? []) filters[key].add(v);
+    }
+    return filters;
+}
+
+function buildPresetSnapshot() {
+    const snapshot = {};
+    for (const key of PRESET_FIELDS) snapshot[key] = state[key];
+    snapshot.filtersA = serializeFilters(state.filtersA);
+    snapshot.filtersB = serializeFilters(state.filtersB);
+    return snapshot;
+}
+
+function applyPresetSnapshot(data) {
+    for (const key of PRESET_FIELDS) {
+        if (data[key] !== undefined) state[key] = data[key];
+    }
+    state.filtersA = deserializeFilters(data.filtersA);
+    state.filtersB = deserializeFilters(data.filtersB);
+}
+
+let presetNames = [];
+
+async function refreshPresetNames() {
+    if (!(await exists(presetsDir))) { presetNames = []; return; }
+    presetNames = (await readDir(presetsDir))
+        .filter((e) => e.isFile && e.name.endsWith(".md"))
+        .map((e) => e.name.replace(/\.md$/, ""))
+        .sort((a, b) => a.localeCompare(b, "de"));
+}
+
+async function savePreset(name) {
+    const frontmatter = dumpYaml(buildPresetSnapshot(), { sortKeys: false, lineWidth: -1 });
+    await mkdir(presetsDir, { recursive: true });
+    await writeTextFile(await join(presetsDir, `${name}.md`), `---\n${frontmatter}---\n`);
+    await refreshPresetNames();
+}
+
+async function loadPresetByName(name) {
+    const raw = await readTextFile(await join(presetsDir, `${name}.md`));
+    applyPresetSnapshot(loadYaml(raw.split("---")[1]) ?? {});
+}
+
+async function deletePresetByName(name) {
+    await remove(await join(presetsDir, `${name}.md`));
+    await refreshPresetNames();
+}
+
 function dataUrlToBytes(dataUrl) {
     const base64 = dataUrl.split(",")[1];
     const binary = atob(base64);
@@ -1000,6 +1105,28 @@ function buildSettingsTabHtml() {
     const open = (key) => (state.collapsedCategories.has(key) ? "" : "open");
 
     return `
+        <details class="transcribe-category cone-category" data-category="presets" ${open("presets")}>
+            <summary>Voreinstellungen</summary>
+            <div class="transcribe-field">
+                <label>Name</label>
+                <input type="text" id="cone-preset-name-input" placeholder="z. B. Mobilität Moosach">
+            </div>
+            <button type="button" class="btn btn-primary btn-shadow-inset" id="cone-preset-save-button">Speichern</button>
+            ${presetNames.length > 0 ? `
+                <div class="cone-preset-list">
+                    ${presetNames.map((name) => `
+                        <div class="cone-preset-item">
+                            <span>${escapeHtml(name)}</span>
+                            <div class="cone-preset-item-actions">
+                                <button type="button" class="link-secondary" data-action="load-preset" data-preset-name="${escapeHtml(name)}">Laden</button>
+                                <button type="button" class="link-secondary" data-action="delete-preset" data-preset-name="${escapeHtml(name)}">Löschen</button>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            ` : `<p class="transcribe-static">Noch keine Voreinstellungen gespeichert.</p>`}
+        </details>
+
         <details class="transcribe-category cone-category" data-category="zeitausschnitt" ${open("zeitausschnitt")}>
             <summary>Zeitausschnitt</summary>
             <div class="transcribe-field">
@@ -1302,6 +1429,17 @@ function renderSidebar() {
         });
     }
 
+    const presetSaveButton = sidebarContentEl.querySelector("#cone-preset-save-button");
+    if (presetSaveButton) {
+        presetSaveButton.addEventListener("click", async () => {
+            const nameInput = sidebarContentEl.querySelector("#cone-preset-name-input");
+            const name = nameInput.value.trim();
+            if (!name) return;
+            await savePreset(name);
+            renderAll();
+        });
+    }
+
     // Auf/zu merken, ohne neu zu rendern — der Browser hat die Sektion schon
     // sichtbar umgeschaltet, ein renderAll() würde das nur unnötig wiederholen.
     for (const details of sidebarContentEl.querySelectorAll(".cone-category")) {
@@ -1393,7 +1531,23 @@ sidebarContentEl.addEventListener("click", (event) => {
     }
 
     const removeIllustrationButton = event.target.closest('[data-action="remove-illustration"]');
-    if (removeIllustrationButton) { state.illustrationUrl = null; renderAll(); }
+    if (removeIllustrationButton) { state.illustrationUrl = null; renderAll(); return; }
+
+    const loadPresetButton = event.target.closest('[data-action="load-preset"]');
+    if (loadPresetButton) {
+        loadPresetByName(loadPresetButton.dataset.presetName).then(renderAll);
+        return;
+    }
+
+    const deletePresetButton = event.target.closest('[data-action="delete-preset"]');
+    if (deletePresetButton) {
+        const name = deletePresetButton.dataset.presetName;
+        confirm(`Voreinstellung "${name}" wirklich löschen?`, { title: "Löschen bestätigen", kind: "warning" }).then(async (confirmed) => {
+            if (!confirmed) return;
+            await deletePresetByName(name);
+            renderAll();
+        });
+    }
 });
 
 sidebarContentEl.addEventListener("change", (event) => {
@@ -1479,13 +1633,17 @@ exportSvgButton.addEventListener("click", async () => {
 exportPngButton.addEventListener("click", async () => {
     const svgEl = canvasAreaEl.querySelector("svg");
     if (!svgEl) return;
+    // Bei "Nur obere Hälfte" hat das SVG ein kleineres viewBox als SVG_HEIGHT —
+    // das tatsächliche viewBox auslesen statt der festen Konstante, sonst wird
+    // das Bild beim Rastern auf die volle Höhe gezerrt.
+    const renderedHeight = svgEl.viewBox.baseVal.height || SVG_HEIGHT;
     const svgString = new XMLSerializer().serializeToString(svgEl);
     const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
 
     const canvas = document.createElement("canvas");
     canvas.width = SVG_WIDTH * 2;
-    canvas.height = SVG_HEIGHT * 2;
+    canvas.height = renderedHeight * 2;
     const ctx = canvas.getContext("2d");
     ctx.scale(2, 2);
 
@@ -1493,8 +1651,8 @@ exportPngButton.addEventListener("click", async () => {
         const img = new Image();
         img.onload = () => {
             ctx.fillStyle = state.bgColor;
-            ctx.fillRect(0, 0, SVG_WIDTH, SVG_HEIGHT);
-            ctx.drawImage(img, 0, 0, SVG_WIDTH, SVG_HEIGHT);
+            ctx.fillRect(0, 0, SVG_WIDTH, renderedHeight);
+            ctx.drawImage(img, 0, 0, SVG_WIDTH, renderedHeight);
             URL.revokeObjectURL(url);
             resolve(canvas.toDataURL("image/png"));
         };
@@ -1505,6 +1663,25 @@ exportPngButton.addEventListener("click", async () => {
     const filePath = await save({ defaultPath: "zukunftskegel.png", filters: [{ name: "PNG", extensions: ["png"] }] });
     if (!filePath) return;
     await writeFile(filePath, dataUrlToBytes(dataUrl));
+});
+
+exportTableButton.addEventListener("click", async () => {
+    const filteredA = applyFilters(allEntries, state.filtersA);
+    const columns = state.splitMode ? ["Hälfte", ...TABLE_EXPORT_COLUMNS] : TABLE_EXPORT_COLUMNS;
+    const rows = [];
+    if (state.splitMode) {
+        const filteredB = applyFilters(allEntries, state.filtersB);
+        for (const e of filteredA) rows.push(["Oben", ...entryToTableRow(e)]);
+        for (const e of filteredB) rows.push(["Unten", ...entryToTableRow(e)]);
+    } else {
+        for (const e of filteredA) rows.push(entryToTableRow(e));
+    }
+
+    const filePath = await save({ defaultPath: "zukunftskegel-tabelle.csv", filters: [{ name: "CSV", extensions: ["csv"] }] });
+    if (!filePath) return;
+    const csv = toCsv(columns, rows);
+    // BOM voranstellen, damit Excel die UTF-8-Kodierung (Umlaute) korrekt erkennt.
+    await writeTextFile(filePath, `﻿${csv}`);
 });
 
 // ---- Start ----
@@ -1518,4 +1695,5 @@ async function reloadData() {
 }
 
 await reloadData();
+await refreshPresetNames();
 renderAll();

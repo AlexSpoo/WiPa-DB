@@ -2132,3 +2132,25 @@ select option {
 .cone-filter-summary li {
   margin-bottom: .2vh;
 }
+
+.cone-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: .5vh;
+  margin-top: 1.5vh;
+}
+
+.cone-preset-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1vh;
+  padding: .6vh 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 30%, transparent);
+}
+
+.cone-preset-item-actions {
+  display: flex;
+  gap: 1.2vh;
+  flex-shrink: 0;
+}
